@@ -1,0 +1,1017 @@
+import React, { useState } from 'react';
+import { UserRole, Listing, QuoteRequest, QuoteOffer } from '../types';
+import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Pie, Cell } from 'recharts';
+import CitySearchInput from './CitySearchInput';
+
+interface DashboardProps {
+  role: UserRole;
+  isPosting?: boolean;
+  verificationStatus?: 'unverified' | 'pending' | 'verified';
+  listings?: Listing[];
+  notifications?: {id: number, text: string, time: string}[];
+  quoteRequests?: QuoteRequest[];
+  quoteOffers?: QuoteOffer[];
+  onPostListing?: (listing: Listing) => void;
+  onUpdateListing?: (listing: Listing) => void;
+  onDeleteListing?: (id: string) => void;
+  onRequestQuote?: (quote: any) => void;
+  onAcceptOffer?: (offerId: string, addresses?: { collection?: string, delivery?: string }) => void;
+  onDeclineOffer?: (offerId: string) => void;
+}
+
+const revenueData = [
+  { name: 'Mon', jobs: 4, revenue: 2400 },
+  { name: 'Tue', jobs: 3, revenue: 1398 },
+  { name: 'Wed', jobs: 9, revenue: 9800 },
+  { name: 'Thu', jobs: 2, revenue: 3908 },
+  { name: 'Fri', jobs: 6, revenue: 4800 },
+  { name: 'Sat', jobs: 2, revenue: 3800 },
+  { name: 'Sun', jobs: 1, revenue: 4300 },
+];
+
+const marketPriceData = [
+    { day: 'Mon', price: 1200 },
+    { day: 'Tue', price: 1150 },
+    { day: 'Wed', price: 1100 },
+    { day: 'Thu', price: 1180 },
+    { day: 'Fri', price: 1250 },
+    { day: 'Sat', price: 1300 },
+    { day: 'Sun', price: 1350 },
+];
+
+const truckUtilizationData = [
+    { name: 'Utilized', value: 78, color: '#10b981' },
+    { name: 'Idle', value: 22, color: '#e2e8f0' }
+];
+
+const VEHICLE_OPTIONS = [
+  'Flatbed', 
+  'Refrigerated', 
+  'Box Truck', 
+  'Tanker', 
+  'Link', 
+  '6m', 
+  '12m', 
+  '8 Ton', 
+  'Other'
+];
+
+const STANDARD_MARKUP = 0.10; // 10%
+const PROMO_MARKUP = 0.05;    // 5%
+
+const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string, icon: any, color: string, subtext?: string }) => (
+  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center">
+    <div className={`p-4 rounded-full ${color} bg-opacity-10 mr-4`}>
+      <Icon className={color.replace('bg-', 'text-')} size={24} />
+    </div>
+    <div>
+      <p className="text-sm text-slate-500 font-medium">{title}</p>
+      <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
+      {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
+    </div>
+  </div>
+);
+
+const Dashboard: React.FC<DashboardProps> = ({ 
+  role, 
+  verificationStatus, 
+  isPosting, 
+  listings = [], 
+  notifications = [],
+  quoteRequests = [],
+  quoteOffers = [],
+  onPostListing,
+  onUpdateListing,
+  onDeleteListing,
+  onRequestQuote,
+}) => {
+  // Filter listings for the current carrier (mock ID 'c1' for demo)
+  const myListings = listings.filter(l => l.carrierId === 'c1');
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  
+  // Shipper Quote State
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  const [quoteForm, setQuoteForm] = useState({
+    origin: '',
+    destination: '',
+    date: '',
+    cargoType: '',
+    weight: '',
+    vehicleType: 'Flatbed',
+    vehicleCustom: '',
+    serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot'
+  });
+
+  // Carrier Post Load Form
+  const [postForm, setPostForm] = useState({
+    origin: '',
+    destination: '',
+    date: '',
+    collectionWindow: '', 
+    deliveryWindow: '',   
+    vehicleSelect: 'Flatbed',
+    vehicleCustom: '',
+    serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot',
+    availabilityType: 'Full' as 'Full' | 'Shared Space',
+    spaceDetails: '',
+    baseRate: '',
+    isPromotion: false
+  });
+
+  const handlePostSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onPostListing) return;
+    
+    const finalVehicleType = postForm.vehicleSelect === 'Other' 
+      ? postForm.vehicleCustom 
+      : postForm.vehicleSelect;
+
+    // Markup Logic: Add 10% (or 5% if promo) to the carrier's base rate
+    const carrierRate = parseFloat(postForm.baseRate);
+    const markup = postForm.isPromotion ? PROMO_MARKUP : STANDARD_MARKUP;
+    const marketPrice = carrierRate * (1 + markup);
+
+    if (editingId && onUpdateListing) {
+      // Update existing listing
+      const existing = listings.find(l => l.id === editingId);
+      if (existing) {
+        onUpdateListing({
+          ...existing,
+          origin: postForm.origin,
+          destination: postForm.destination,
+          date: postForm.date,
+          collectionWindow: postForm.collectionWindow,
+          deliveryWindow: postForm.deliveryWindow,
+          vehicleType: finalVehicleType,
+          serviceType: postForm.serviceType,
+          availableDetails: postForm.availabilityType === 'Shared Space' ? postForm.spaceDetails : undefined,
+          baseRate: carrierRate,
+          price: marketPrice
+        });
+      }
+      setEditingId(null);
+    } else {
+      // Create new listing
+      const newRoute: Listing = {
+        id: Math.random().toString(36).substr(2, 9),
+        carrierId: 'c1', // Mock ID
+        carrierName: 'Swift Logistics', // Mock Name
+        origin: postForm.origin,
+        destination: postForm.destination,
+        date: postForm.date,
+        collectionWindow: postForm.collectionWindow,
+        deliveryWindow: postForm.deliveryWindow,
+        vehicleType: finalVehicleType,
+        serviceType: postForm.serviceType,
+        availableTons: 0, // Default
+        availablePallets: 0, // Default
+        availableDetails: postForm.availabilityType === 'Shared Space' ? postForm.spaceDetails : undefined,
+        baseRate: carrierRate,
+        price: marketPrice,
+        isBooked: false
+      };
+      onPostListing(newRoute);
+    }
+
+    // Reset Form
+    setPostForm({
+      origin: '',
+      destination: '',
+      date: '',
+      collectionWindow: '',
+      deliveryWindow: '',
+      vehicleSelect: 'Flatbed',
+      vehicleCustom: '',
+      serviceType: 'Door-to-Door',
+      availabilityType: 'Full',
+      spaceDetails: '',
+      baseRate: '',
+      isPromotion: false
+    });
+    
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
+  };
+
+  const handleQuoteSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (onRequestQuote) {
+          const finalVehicle = quoteForm.vehicleType === 'Other' ? quoteForm.vehicleCustom : quoteForm.vehicleType;
+          onRequestQuote({
+              ...quoteForm,
+              vehicleType: finalVehicle
+          });
+      }
+      setIsQuoteModalOpen(false);
+      setQuoteForm({
+          origin: '',
+          destination: '',
+          date: '',
+          cargoType: '',
+          weight: '',
+          vehicleType: 'Flatbed',
+          vehicleCustom: '',
+          serviceType: 'Door-to-Door'
+      });
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+  };
+
+  const handleEdit = (route: Listing) => {
+    const isCustom = !VEHICLE_OPTIONS.includes(route.vehicleType) && route.vehicleType !== 'Other';
+    const impliedMarkup = (route.price / route.baseRate) - 1;
+    
+    setPostForm({
+      origin: route.origin,
+      destination: route.destination,
+      date: route.date,
+      collectionWindow: route.collectionWindow || '',
+      deliveryWindow: route.deliveryWindow || '',
+      vehicleSelect: isCustom ? 'Other' : route.vehicleType,
+      vehicleCustom: isCustom ? route.vehicleType : '',
+      serviceType: route.serviceType || 'Door-to-Door',
+      availabilityType: route.availableDetails ? 'Shared Space' : 'Full',
+      spaceDetails: route.availableDetails || '',
+      baseRate: route.baseRate.toString(),
+      isPromotion: impliedMarkup < 0.08 // Approximation for edit state reconstruction
+    });
+    setEditingId(route.id);
+    setShowSuccess(false);
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to remove this listing?')) {
+      if (onDeleteListing) onDeleteListing(id);
+    }
+  };
+
+  if (role === 'carrier') {
+    if (verificationStatus !== 'verified') {
+       return (
+         <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+           <AlertTriangle className="mx-auto text-amber-500 mb-4" size={48} />
+           <h2 className="text-xl font-bold text-slate-800 mb-2">Account Verification Required</h2>
+           <p className="text-slate-600">Please complete the onboarding process to access your dashboard.</p>
+         </div>
+       );
+    }
+
+    if (isPosting) {
+      // Calculate preview for carrier
+      const previewBase = parseFloat(postForm.baseRate) || 0;
+      const previewMarkup = postForm.isPromotion ? PROMO_MARKUP : STANDARD_MARKUP;
+      const previewPrice = previewBase * (1 + previewMarkup);
+
+      return (
+        <div className="max-w-3xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-slate-800">
+              {editingId ? 'Edit Route' : 'Post Empty Leg'}
+            </h2>
+          </div>
+          
+          {showSuccess && (
+             <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-6 flex items-center border border-emerald-200 animate-in fade-in slide-in-from-top-4">
+               <CheckCircle className="mr-2" size={20} />
+               Listing {editingId ? 'updated' : 'posted'} successfully! It is now visible in the marketplace.
+             </div>
+          )}
+          
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 md:p-8">
+             <form onSubmit={handlePostSubmit} className="space-y-6">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <CitySearchInput 
+                    label="Origin"
+                    placeholder="e.g., Johannesburg"
+                    value={postForm.origin}
+                    onChange={(val) => setPostForm(prev => ({...prev, origin: val}))}
+                    required={true}
+                 />
+                 
+                 <CitySearchInput 
+                    label="Destination"
+                    placeholder="e.g., Cape Town"
+                    value={postForm.destination}
+                    onChange={(val) => setPostForm(prev => ({...prev, destination: val}))}
+                    required={true}
+                 />
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 <div>
+                   <label className="block text-sm font-medium text-slate-700 mb-1">Date Available</label>
+                   <div className="relative">
+                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                     <input 
+                       type="date" 
+                       className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                       value={postForm.date}
+                       onChange={(e) => setPostForm({...postForm, date: e.target.value})}
+                       required
+                     />
+                   </div>
+                 </div>
+
+                 {/* Window Inputs */}
+                 <div>
+                   <label className="block text-sm font-medium text-slate-700 mb-1">Collection Window</label>
+                   <input 
+                     type="text" 
+                     placeholder="e.g. 08:00 - 12:00"
+                     className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                     value={postForm.collectionWindow}
+                     onChange={(e) => setPostForm({...postForm, collectionWindow: e.target.value})}
+                   />
+                 </div>
+
+                 <div>
+                   <label className="block text-sm font-medium text-slate-700 mb-1">Delivery Window</label>
+                   <input 
+                     type="text" 
+                     placeholder="e.g. 14:00 - 18:00"
+                     className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                     value={postForm.deliveryWindow}
+                     onChange={(e) => setPostForm({...postForm, deliveryWindow: e.target.value})}
+                   />
+                 </div>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div>
+                   <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
+                   <select 
+                     className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                     value={postForm.vehicleSelect}
+                     onChange={(e) => setPostForm({...postForm, vehicleSelect: e.target.value})}
+                   >
+                     {VEHICLE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                   </select>
+                 </div>
+                 
+                 {postForm.vehicleSelect === 'Other' && (
+                   <div>
+                     <label className="block text-sm font-medium text-slate-700 mb-1">Specify Vehicle Type</label>
+                     <input 
+                       type="text"
+                       placeholder="Type your vehicle description..."
+                       className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                       value={postForm.vehicleCustom}
+                       onChange={(e) => setPostForm({...postForm, vehicleCustom: e.target.value})}
+                       required
+                     />
+                   </div>
+                 )}
+               </div>
+
+                {/* Service Type Section */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
+                    <div className="flex gap-4">
+                    <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
+                        <input 
+                        type="radio" 
+                        name="serviceType" 
+                        value="Door-to-Door"
+                        checked={postForm.serviceType === 'Door-to-Door'}
+                        onChange={() => setPostForm({...postForm, serviceType: 'Door-to-Door'})}
+                        className="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500"
+                        />
+                        <div className="ml-3">
+                            <span className="block text-sm font-medium text-slate-800">Collect & Deliver</span>
+                            <span className="block text-xs text-slate-500">Door-to-Door Service</span>
+                        </div>
+                    </label>
+                    <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
+                        <input 
+                        type="radio" 
+                        name="serviceType" 
+                        value="Depot-to-Depot"
+                        checked={postForm.serviceType === 'Depot-to-Depot'}
+                        onChange={() => setPostForm({...postForm, serviceType: 'Depot-to-Depot'})}
+                        className="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500"
+                        />
+                         <div className="ml-3">
+                            <span className="block text-sm font-medium text-slate-800">Depot-to-Depot</span>
+                            <span className="block text-xs text-slate-500">Hub-to-Hub Service</span>
+                        </div>
+                    </label>
+                    </div>
+                </div>
+
+               {/* Capacity Section */}
+               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <label className="block text-sm font-medium text-slate-700 mb-3">Space Available</label>
+                  <div className="flex gap-4 mb-4">
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="availabilityType" 
+                        value="Full"
+                        checked={postForm.availabilityType === 'Full'}
+                        onChange={() => setPostForm({...postForm, availabilityType: 'Full'})}
+                        className="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500"
+                      />
+                      <span className="ml-2 text-sm text-slate-700">Full Vehicle</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="availabilityType" 
+                        value="Shared Space"
+                        checked={postForm.availabilityType === 'Shared Space'}
+                        onChange={() => setPostForm({...postForm, availabilityType: 'Shared Space'})}
+                        className="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500"
+                      />
+                      <span className="ml-2 text-sm text-slate-700">Shared Space (Part Load)</span>
+                    </label>
+                  </div>
+
+                  {postForm.availabilityType === 'Shared Space' && (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                      <label className="block text-xs text-slate-500 mb-1 uppercase font-bold">Description of Space</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g., 3 Pallet spaces, 5 meters deck, Half truck..."
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={postForm.spaceDetails}
+                        onChange={(e) => setPostForm({...postForm, spaceDetails: e.target.value})}
+                        required
+                      />
+                    </div>
+                  )}
+               </div>
+
+               {/* Rate and Markup Section */}
+               <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Your Required Rate (Net Earnings)</label>
+                    <div className="relative">
+                        <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-bold">R</span>
+                        <input 
+                        type="number" 
+                        placeholder="0.00" 
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={postForm.baseRate}
+                        onChange={(e) => setPostForm({...postForm, baseRate: e.target.value})}
+                        required
+                        />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 font-medium">This is the amount you will be paid.</p>
+                 </div>
+
+                 <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-2">
+                        <Percent size={18} className="text-emerald-600" />
+                        <div>
+                            <span className="text-sm font-bold text-slate-700 block">Run Promotion?</span>
+                            <span className="text-xs text-slate-500">Reduce markup to 5% to attract more customers</span>
+                        </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={postForm.isPromotion}
+                          onChange={(e) => setPostForm({...postForm, isPromotion: e.target.checked})}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                 </div>
+
+                 {/* Preview Calculation */}
+                 {previewBase > 0 && (
+                     <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-200">
+                         <span className="text-sm text-slate-500">Customer sees:</span>
+                         <div className="text-right">
+                             <span className="block font-bold text-slate-800">R {previewPrice.toLocaleString()}</span>
+                             <span className="text-xs text-slate-400">Includes platform markup</span>
+                         </div>
+                     </div>
+                 )}
+               </div>
+
+               <div className="pt-4 flex gap-3">
+                 {editingId && (
+                   <button 
+                     type="button"
+                     onClick={() => {
+                       setEditingId(null);
+                       setPostForm({
+                        origin: '',
+                        destination: '',
+                        date: '',
+                        collectionWindow: '',
+                        deliveryWindow: '',
+                        vehicleSelect: 'Flatbed',
+                        vehicleCustom: '',
+                        serviceType: 'Door-to-Door',
+                        availabilityType: 'Full',
+                        spaceDetails: '',
+                        baseRate: '',
+                        isPromotion: false
+                       });
+                     }}
+                     className="px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-lg hover:bg-slate-200"
+                   >
+                     Cancel
+                   </button>
+                 )}
+                 <button 
+                   type="submit" 
+                   className="flex-1 bg-brand-900 text-white py-3 rounded-lg font-bold hover:bg-brand-800 transition-colors flex justify-center items-center gap-2"
+                 >
+                   {editingId ? 'Update Route' : 'Post Route'}
+                   <Truck size={20} />
+                 </button>
+               </div>
+             </form>
+          </div>
+
+          {/* List of Posted Routes */}
+          <div className="mt-10">
+             <h3 className="text-xl font-bold text-slate-800 mb-4">Your Posted Routes</h3>
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+               {myListings.length === 0 ? (
+                 <div className="p-8 text-center text-slate-500">
+                   You haven't posted any routes yet.
+                 </div>
+               ) : (
+                 <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-6 py-4 font-semibold text-slate-600">Route</th>
+                        <th className="px-6 py-4 font-semibold text-slate-600">Type</th>
+                        <th className="px-6 py-4 font-semibold text-slate-600">Vehicle</th>
+                        <th className="px-6 py-4 font-semibold text-slate-600">Net Earnings</th>
+                        <th className="px-6 py-4 font-semibold text-slate-600 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {myListings.map(listing => (
+                        <tr key={listing.id} className="hover:bg-slate-50">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-800">{listing.origin} → {listing.destination}</span>
+                              <span className="text-xs text-slate-500">{listing.date}</span>
+                              {(listing.collectionWindow || listing.deliveryWindow) && (
+                                <span className="text-[10px] text-slate-400 mt-0.5">
+                                    {listing.collectionWindow} {listing.deliveryWindow ? `- ${listing.deliveryWindow}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                           <td className="px-6 py-4">
+                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">
+                                {listing.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{listing.vehicleType}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-emerald-600">R {listing.baseRate.toLocaleString()}</span>
+                            <span className="block text-[10px] text-slate-400">Earnings</span>
+                          </td>
+                          <td className="px-6 py-4 text-right flex justify-end gap-2">
+                            <button 
+                              type="button"
+                              onClick={() => handleEdit(listing)}
+                              className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded"
+                              title="Edit"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={(e) => handleDelete(listing.id, e)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                 </div>
+               )}
+             </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-slate-800">Carrier Dashboard</h2>
+        </div>
+
+        {/* Notification Banner */}
+        {notifications.length > 0 && (
+           <div className="bg-brand-50 border border-brand-200 rounded-lg p-4 mb-2 flex items-start gap-3">
+              <Info className="text-brand-600 mt-0.5" size={18} />
+              <div>
+                 <h4 className="text-sm font-bold text-brand-800">Latest Updates</h4>
+                 <ul className="mt-1 space-y-1">
+                    {notifications.slice(0,2).map((n) => (
+                      <li key={n.id} className="text-xs text-brand-700 flex items-center gap-2">
+                         <span className="w-1 h-1 bg-brand-500 rounded-full"></span>
+                         {n.text} <span className="text-brand-400 opacity-75">- {n.time}</span>
+                      </li>
+                    ))}
+                 </ul>
+              </div>
+           </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard title="Total Revenue" value="R 45,200" icon={Banknote} color="bg-emerald-500" />
+          <StatCard title="Active Jobs" value="3" icon={Truck} color="bg-blue-500" />
+          <StatCard title="Route Matches" value="12" icon={Activity} color="bg-purple-500" />
+        </div>
+
+        {/* TRANSPORTER ANALYTICS: Fleet Utilization & Earnings */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
+            <div className="flex items-center justify-between mb-6">
+                <h3 className="font-bold text-slate-800">Weekly Earnings</h3>
+                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">+12% vs last week</span>
+            </div>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `R${value}`} />
+                  <Tooltip 
+                    cursor={{fill: '#f1f5f9'}}
+                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
+                  />
+                  <Bar dataKey="revenue" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Truck Utilization Chart */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col">
+            <h3 className="font-bold text-slate-800 mb-2">Truck Utilization</h3>
+            <p className="text-xs text-slate-500 mb-6">Percentage of fleet currently active.</p>
+            
+            <div className="flex-1 flex items-center justify-center relative">
+                <div className="h-40 w-40">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={truckUtilizationData}
+                                innerRadius={40}
+                                outerRadius={60}
+                                paddingAngle={5}
+                                dataKey="value"
+                            >
+                                {truckUtilizationData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                        </PieChart>
+                     </ResponsiveContainer>
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-3xl font-bold text-slate-800">78%</span>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-widest">Active</span>
+                </div>
+            </div>
+            
+            <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                   <span className="flex items-center gap-2 text-slate-600">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Utilized
+                   </span>
+                   <span className="font-bold text-slate-800">7 Trucks</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                   <span className="flex items-center gap-2 text-slate-600">
+                      <div className="w-2 h-2 rounded-full bg-slate-300"></div> Idle
+                   </span>
+                   <span className="font-bold text-slate-800">2 Trucks</span>
+                </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Peak Profitable Routes */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-slate-800 mb-4">Peak Profitable Routes</h3>
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <span className="bg-white p-1.5 rounded border border-slate-200 text-xs font-bold text-slate-500">#1</span>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">Johannesburg → Cape Town</p>
+                                <p className="text-xs text-slate-500">Avg. R14,500 per trip</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <span className="block text-emerald-600 font-bold text-sm">High Demand</span>
+                            <span className="text-[10px] text-slate-400">12 loads this week</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <span className="bg-white p-1.5 rounded border border-slate-200 text-xs font-bold text-slate-500">#2</span>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">Durban → Johannesburg</p>
+                                <p className="text-xs text-slate-500">Avg. R9,200 per trip</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <span className="block text-blue-600 font-bold text-sm">Steady</span>
+                            <span className="text-[10px] text-slate-400">8 loads this week</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-slate-800 mb-4">Recent Activity</h3>
+                <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-start pb-4 border-b border-slate-50 last:border-0">
+                    <div className="bg-slate-100 p-2 rounded-lg mr-4">
+                        <Clock size={16} className="text-slate-500" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-slate-800">New load match found</p>
+                        <p className="text-xs text-slate-500 mt-1">Johannesburg to Durban • Refrigerated</p>
+                        <p className="text-xs text-slate-400 mt-1">2 hours ago</p>
+                    </div>
+                    </div>
+                ))}
+                </div>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Shipper Dashboard logic
+  return (
+    <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-slate-800">Shipper Dashboard</h2>
+          <button 
+            onClick={() => setIsQuoteModalOpen(true)}
+            className="bg-brand-900 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-brand-800 shadow-sm"
+          >
+             <PlusCircle size={18} />
+             Request Quote
+          </button>
+        </div>
+
+        {showSuccess && (
+           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center gap-2 text-emerald-800 animate-in fade-in slide-in-from-top-2">
+               <CheckCircle size={20} />
+               <span className="font-medium">Operation successful! Carrier has been notified.</span>
+           </div>
+        )}
+
+        {notifications.length > 0 && (
+           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-2 flex items-start gap-3">
+              <Info className="text-blue-600 mt-0.5" size={18} />
+              <div>
+                 <h4 className="text-sm font-bold text-blue-800">Marketplace Updates</h4>
+                 <ul className="mt-1 space-y-1">
+                    {notifications.slice(0,3).map((n) => (
+                      <li key={n.id} className="text-xs text-blue-700 flex items-center gap-2">
+                         <span className="w-1 h-1 bg-blue-500 rounded-full"></span>
+                         {n.text} <span className="text-blue-400 opacity-75">- {n.time}</span>
+                      </li>
+                    ))}
+                 </ul>
+              </div>
+           </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard title="Bookings" value="5" icon={Package} color="bg-purple-500" />
+          <StatCard title="Open Requests" value={quoteRequests.filter(r => r.status === 'Open').length.toString()} icon={FileText} color="bg-orange-500" />
+          <StatCard title="Pending Offers" value={quoteOffers.filter(o => o.status === 'Pending').length.toString()} icon={MessageSquare} color="bg-blue-500" />
+        </div>
+
+        {/* MARKET STATISTICS FOR CUSTOMERS */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="font-bold text-slate-800">Market Price Trends</h3>
+                        <p className="text-xs text-slate-500">Average lane price per ton (ZAR)</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-medium bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
+                        <TrendingDown size={14} />
+                        Prices down 5% this week
+                    </div>
+                </div>
+                <div className="h-64 w-full">
+                   <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={marketPriceData}>
+                         <defs>
+                            <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                               <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/>
+                               <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                            </linearGradient>
+                         </defs>
+                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                         <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                         <Tooltip 
+                           contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
+                         />
+                         <Area type="monotone" dataKey="price" stroke="#0ea5e9" fillOpacity={1} fill="url(#colorPrice)" strokeWidth={3} />
+                      </AreaChart>
+                   </ResponsiveContainer>
+                </div>
+            </div>
+
+            <div className="space-y-6">
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                   <h3 className="font-bold text-slate-800 mb-4">Market Insights</h3>
+                   
+                   <div className="mb-4 pb-4 border-b border-slate-50">
+                       <p className="text-xs text-slate-500 uppercase font-bold mb-1">Cheapest Day to Ship</p>
+                       <p className="text-xl font-bold text-emerald-600 flex items-center gap-2">
+                          <Calendar size={20} /> Wednesday
+                       </p>
+                       <p className="text-xs text-slate-400 mt-1">Approx 12% cheaper than Monday.</p>
+                   </div>
+                   
+                   <div>
+                       <p className="text-xs text-slate-500 uppercase font-bold mb-1">Avg Transporter Reliability</p>
+                       <p className="text-xl font-bold text-amber-500 flex items-center gap-2">
+                          ★ 4.8 / 5.0
+                       </p>
+                       <p className="text-xs text-slate-400 mt-1">Based on last 30 days of delivery.</p>
+                   </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 text-center">
+                    <h3 className="text-sm font-bold text-slate-800 mb-2">Manage Your Quotes</h3>
+                    <p className="text-xs text-slate-500 mb-4">View all requests, compare offers, and book in one place.</p>
+                    <button className="w-full bg-white border border-slate-300 text-slate-700 py-2 rounded-lg font-medium hover:bg-slate-50 text-sm">
+                        View Requested Quotes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {/* Request Quote Modal */}
+        {isQuoteModalOpen && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl font-bold text-slate-800">Request a Quote</h3>
+                        <button onClick={() => setIsQuoteModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                            <X size={24} />
+                        </button>
+                    </div>
+                    
+                    <form onSubmit={handleQuoteSubmit} className="space-y-6">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <CitySearchInput 
+                                label="Origin"
+                                placeholder="Start location..."
+                                value={quoteForm.origin}
+                                onChange={(val) => setQuoteForm({...quoteForm, origin: val})}
+                                required
+                             />
+                             <CitySearchInput 
+                                label="Destination"
+                                placeholder="End location..."
+                                value={quoteForm.destination}
+                                onChange={(val) => setQuoteForm({...quoteForm, destination: val})}
+                                required
+                             />
+                         </div>
+                         
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div>
+                                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo Type</label>
+                                 <input 
+                                    type="text" 
+                                    placeholder="e.g. Palletized Goods" 
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={quoteForm.cargoType}
+                                    onChange={(e) => setQuoteForm({...quoteForm, cargoType: e.target.value})}
+                                    required
+                                 />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-medium text-slate-700 mb-1">Weight (Tons)</label>
+                                 <input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={quoteForm.weight}
+                                    onChange={(e) => setQuoteForm({...quoteForm, weight: e.target.value})}
+                                    required
+                                 />
+                             </div>
+                         </div>
+
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div>
+                                 <label className="block text-sm font-medium text-slate-700 mb-1">Preferred Date</label>
+                                 <input 
+                                    type="date" 
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={quoteForm.date}
+                                    onChange={(e) => setQuoteForm({...quoteForm, date: e.target.value})}
+                                    required
+                                 />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
+                                 <select 
+                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={quoteForm.vehicleType}
+                                    onChange={(e) => setQuoteForm({...quoteForm, vehicleType: e.target.value})}
+                                 >
+                                     {VEHICLE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                 </select>
+                             </div>
+                         </div>
+
+                         {quoteForm.vehicleType === 'Other' && (
+                             <div>
+                               <label className="block text-sm font-medium text-slate-700 mb-1">Specify Vehicle Type</label>
+                               <input 
+                                 type="text"
+                                 placeholder="Type vehicle description..."
+                                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                 value={quoteForm.vehicleCustom}
+                                 onChange={(e) => setQuoteForm({...quoteForm, vehicleCustom: e.target.value})}
+                                 required
+                               />
+                             </div>
+                         )}
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
+                                    <input 
+                                    type="radio" 
+                                    name="quoteServiceType" 
+                                    value="Door-to-Door"
+                                    checked={quoteForm.serviceType === 'Door-to-Door'}
+                                    onChange={() => setQuoteForm({...quoteForm, serviceType: 'Door-to-Door'})}
+                                    className="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500"
+                                    />
+                                    <div className="ml-3">
+                                        <span className="block text-sm font-medium text-slate-800">Collect & Deliver</span>
+                                    </div>
+                                </label>
+                                <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
+                                    <input 
+                                    type="radio" 
+                                    name="quoteServiceType" 
+                                    value="Depot-to-Depot"
+                                    checked={quoteForm.serviceType === 'Depot-to-Depot'}
+                                    onChange={() => setQuoteForm({...quoteForm, serviceType: 'Depot-to-Depot'})}
+                                    className="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500"
+                                    />
+                                    <div className="ml-3">
+                                        <span className="block text-sm font-medium text-slate-800">Depot-to-Depot</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                         <div className="pt-4">
+                             <button 
+                               type="submit"
+                               className="w-full py-3 bg-brand-900 text-white font-bold rounded-lg hover:bg-brand-800 transition-colors flex items-center justify-center gap-2"
+                             >
+                                 <PlusCircle size={20} />
+                                 Send Request to Marketplace
+                             </button>
+                         </div>
+                    </form>
+                </div>
+            </div>
+        )}
+    </div>
+  );
+};
+
+export default Dashboard;

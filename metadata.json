@@ -1,0 +1,8 @@
+{
+  "name": "Copy of FreightConnect",
+  "description": "A next-gen logistics marketplace connecting shippers with carriers to optimize empty legs. Features role-based dashboards, AI-powered logistics assistance, and digital waybill management.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
