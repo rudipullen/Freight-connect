@@ -240,10 +240,11 @@ export const MOCK_QUOTE_REQUESTS: QuoteRequest[] = [
         serviceCategory: 'Linehaul / Long-Distance Transport',
         serviceType: 'Depot-to-Depot',
         cargoType: 'Frozen Fish',
-        weight: 12,
+        weight: 12000, // 12 tons in kgs
         date: '2024-07-01',
         status: 'Open',
-        createdAt: '2024-06-25'
+        createdAt: '2024-06-25',
+        dimensions: { length: 1200, width: 240, height: 260 } // Example dims
     }
 ];
 

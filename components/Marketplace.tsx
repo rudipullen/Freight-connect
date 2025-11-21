@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock, Users, ShieldCheck } from 'lucide-react';
+import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock, Users, ShieldCheck, Star } from 'lucide-react';
 import { MOCK_LISTINGS, VEHICLE_OPTIONS, MOCK_CARRIERS } from '../constants';
 import { Listing, UserRole } from '../types';
 import CitySearchInput from './CitySearchInput';
@@ -25,6 +25,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
   const [filterVehicle, setFilterVehicle] = useState('');
   const [filterServiceType, setFilterServiceType] = useState('');
   const [filterDate, setFilterDate] = useState('');
+  const [filterLoadingAssist, setFilterLoadingAssist] = useState(false);
   
   const filteredListings = listings.filter(l => {
       const matchesSearch = l.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -39,17 +40,19 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
       const matchesVehicle = !filterVehicle || l.vehicleType === filterVehicle;
       const matchesService = !filterServiceType || l.serviceType === filterServiceType;
       const matchesDate = !filterDate || l.date === filterDate;
+      const matchesLoadingAssist = !filterLoadingAssist || l.includesLoadingAssist;
 
-      return matchesSearch && matchesVehicle && matchesService && matchesDate;
+      return matchesSearch && matchesVehicle && matchesService && matchesDate && matchesLoadingAssist;
   });
 
   const clearFilters = () => {
     setFilterVehicle('');
     setFilterServiceType('');
     setFilterDate('');
+    setFilterLoadingAssist(false);
   };
 
-  const activeFiltersCount = [filterVehicle, filterServiceType, filterDate].filter(Boolean).length;
+  const activeFiltersCount = [filterVehicle, filterServiceType, filterDate, filterLoadingAssist ? 'yes' : ''].filter(Boolean).length;
 
   const handleBook = (listing: Listing) => {
     setSelectedListing(listing);
@@ -78,7 +81,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
     setIsBooking(false);
     setSelectedListing(null);
   };
-  
+
   const getCarrierDetails = (carrierId: string) => {
       return MOCK_CARRIERS.find(c => c.id === carrierId);
   };
@@ -112,7 +115,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
 
       {/* Advanced Filters Panel */}
       {isFilterOpen && (
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
            {/* Vehicle Filter */}
            <div>
                <label className="block text-xs font-bold text-slate-500 mb-1">Vehicle Type</label>
@@ -153,7 +156,23 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
               />
            </div>
 
-           <div className="md:col-span-3 flex justify-end border-t border-slate-200 pt-3 mt-1">
+           {/* Loading Assist Filter */}
+           <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">Requirements</label>
+               <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-3 py-2 w-full bg-white h-[40px] hover:bg-slate-50 transition-colors">
+                  <input 
+                     type="checkbox" 
+                     className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                     checked={filterLoadingAssist}
+                     onChange={(e) => setFilterLoadingAssist(e.target.checked)}
+                  />
+                  <span className="ml-2 text-sm text-slate-700 flex items-center gap-1 font-medium">
+                      <Users size={14} /> Driver Assists
+                  </span>
+              </label>
+           </div>
+
+           <div className="md:col-span-4 flex justify-end border-t border-slate-200 pt-3 mt-1">
               <button 
                  onClick={clearFilters} 
                  className="text-sm text-slate-500 hover:text-red-600 font-medium px-3 py-1 rounded hover:bg-red-50 transition-colors"
@@ -268,11 +287,22 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
               </div>
 
               <div className="bg-slate-50 p-4 border-t border-slate-100">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
-                      {listing.carrierName.substring(0,2)}
-                    </div>
-                    <span className="text-xs font-medium text-slate-600">{listing.carrierName}</span>
+                <div className="flex justify-between items-center mb-3">
+                   <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
+                        {listing.carrierName.substring(0,2)}
+                        </div>
+                        <span className="text-xs font-medium text-slate-600">{listing.carrierName}</span>
+                   </div>
+                   {(() => {
+                       const carrier = getCarrierDetails(listing.carrierId);
+                       return carrier?.rating ? (
+                           <div className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-slate-200 shadow-sm" title={`Rated ${carrier.rating} stars`}>
+                               <Star size={10} className="text-amber-400 fill-amber-400" />
+                               <span className="text-xs font-bold text-slate-700">{carrier.rating}</span>
+                           </div>
+                       ) : null;
+                   })()}
                 </div>
                 <div className="flex gap-2">
                   <button 
@@ -463,7 +493,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
                                             )}
                                             {carrier?.rating && (
                                                 <p className="text-xs text-amber-500 flex items-center gap-1">
-                                                    ★ {carrier.rating}
+                                                    <Star size={10} className="fill-current" /> {carrier.rating}
                                                 </p>
                                             )}
                                         </div>

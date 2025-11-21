@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Users } from 'lucide-react';
 import { DocumentType, CarrierDocument, Vehicle } from '../types';
 import CitySearchInput from './CitySearchInput';
+import { VEHICLE_OPTIONS } from '../constants';
 
 interface Props {
   onComplete: () => void;
@@ -35,24 +36,6 @@ const REQUIRED_DOCS: { type: DocumentType; label: string; description: string; r
   },
 ];
 
-const VEHICLE_TYPES = [
-  '4-Ton Truck (Closed / Curtain Side)',
-  '8-Ton Truck',
-  '10-Ton Truck',
-  'Refrigerated Truck (Small–Medium)',
-  'Interlink - Tautliner / Curtain Side',
-  'Interlink - Flatbed',
-  'Interlink - Drop Side',
-  'Superlink',
-  'Tri-Axle Trailer',
-  'Refrigerated Interlink',
-  'Tipper Truck',
-  'Tanker Truck',
-  'Container Truck (20-ft)',
-  'Container Truck (40-ft)',
-  'Other'
-];
-
 const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,7 +56,7 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
   const vehiclePhotoInputRef = useRef<HTMLInputElement>(null);
   
   const [newVehicle, setNewVehicle] = useState<Partial<Vehicle>>({
-    type: 'Flatbed',
+    type: VEHICLE_OPTIONS[0],
     regNumber: '',
     capacityTons: 0,
     capacityPallets: 0,
@@ -168,7 +151,7 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
     
     // Reset Form
     setNewVehicle({
-      type: 'Flatbed',
+      type: VEHICLE_OPTIONS[0],
       regNumber: '',
       capacityTons: 0,
       capacityPallets: 0,
@@ -643,7 +626,7 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
                                 }
                             }}
                         >
-                            {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            {VEHICLE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
 

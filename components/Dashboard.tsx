@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { UserRole, Listing, QuoteRequest, QuoteOffer } from '../types';
-import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck } from 'lucide-react';
+import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck, Box } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Pie, Cell } from 'recharts';
 import CitySearchInput from './CitySearchInput';
 import { SERVICE_CATEGORIES, VEHICLE_OPTIONS } from '../constants';
@@ -61,7 +62,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string,
   </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ 
+export const Dashboard: React.FC<DashboardProps> = ({ 
   role, 
   verificationStatus, 
   isPosting, 
@@ -91,7 +92,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     vehicleType: VEHICLE_OPTIONS[0],
     vehicleCustom: '',
     serviceCategory: SERVICE_CATEGORIES[0],
-    serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot'
+    serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot',
+    includeDims: false,
+    length: '',
+    width: '',
+    height: ''
   });
 
   // Carrier Post Load Form
@@ -207,10 +212,21 @@ const Dashboard: React.FC<DashboardProps> = ({
       e.preventDefault();
       if (onRequestQuote) {
           const finalVehicle = quoteForm.vehicleType === 'Other' ? quoteForm.vehicleCustom : quoteForm.vehicleType;
-          onRequestQuote({
+          
+          const requestData: any = {
               ...quoteForm,
               vehicleType: finalVehicle
-          });
+          };
+
+          if (quoteForm.includeDims && quoteForm.length && quoteForm.width && quoteForm.height) {
+              requestData.dimensions = {
+                  length: parseFloat(quoteForm.length),
+                  width: parseFloat(quoteForm.width),
+                  height: parseFloat(quoteForm.height)
+              };
+          }
+
+          onRequestQuote(requestData);
       }
       setIsQuoteModalOpen(false);
       setQuoteForm({
@@ -222,7 +238,11 @@ const Dashboard: React.FC<DashboardProps> = ({
           vehicleType: VEHICLE_OPTIONS[0],
           vehicleCustom: '',
           serviceCategory: SERVICE_CATEGORIES[0],
-          serviceType: 'Door-to-Door'
+          serviceType: 'Door-to-Door',
+          includeDims: false,
+          length: '',
+          width: '',
+          height: ''
       });
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
@@ -277,11 +297,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     if (isPosting) {
-      // Calculate preview for carrier
-      const previewBase = parseFloat(postForm.baseRate) || 0;
-      const previewMarkup = STANDARD_MARKUP;
-      const previewPrice = previewBase * (1 + previewMarkup);
-
       return (
         <div className="max-w-3xl mx-auto">
           <div className="flex justify-between items-center mb-6">
@@ -558,17 +573,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <p className="text-xs text-slate-500 mt-1 font-medium">This is the amount you will be paid.</p>
                  </div>
-
-                 {/* Preview Calculation */}
-                 {previewBase > 0 && (
-                     <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-200">
-                         <span className="text-sm text-slate-500">Customer sees:</span>
-                         <div className="text-right">
-                             <span className="block font-bold text-slate-800">R {previewPrice.toLocaleString()}</span>
-                             <span className="text-xs text-slate-400">Includes platform markup</span>
-                         </div>
-                     </div>
-                 )}
                </div>
 
                <div className="pt-4 flex gap-3">
@@ -710,172 +714,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">Carrier Dashboard</h2>
-        </div>
-
-        {/* Notification Banner */}
-        {notifications.length > 0 && (
-           <div className="bg-brand-50 border border-brand-200 rounded-lg p-4 mb-2 flex items-start gap-3">
-              <Info className="text-brand-600 mt-0.5" size={18} />
-              <div>
-                 <h4 className="text-sm font-bold text-brand-800">Latest Updates</h4>
-                 <ul className="mt-1 space-y-1">
-                    {notifications.slice(0,2).map((n) => (
-                      <li key={n.id} className="text-xs text-brand-700 flex items-center gap-2">
-                         <span className="w-1 h-1 bg-brand-500 rounded-full"></span>
-                         {n.text} <span className="text-brand-400 opacity-75">- {n.time}</span>
-                      </li>
-                    ))}
-                 </ul>
-              </div>
-           </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard title="Total Revenue" value="R 45,200" icon={Banknote} color="bg-emerald-500" />
-          <StatCard title="Active Jobs" value="3" icon={Truck} color="bg-blue-500" />
-          <StatCard title="Route Matches" value="12" icon={Activity} color="bg-purple-500" />
-        </div>
-
-        {/* TRANSPORTER ANALYTICS: Fleet Utilization & Earnings */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
-            <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-slate-800">Weekly Earnings</h3>
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">+12% vs last week</span>
-            </div>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `R${value}`} />
-                  <Tooltip 
-                    cursor={{fill: '#f1f5f9'}}
-                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
-                  />
-                  <Bar dataKey="revenue" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Truck Utilization Chart */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col">
-            <h3 className="font-bold text-slate-800 mb-2">Truck Utilization</h3>
-            <p className="text-xs text-slate-500 mb-6">Percentage of fleet currently active.</p>
-            
-            <div className="flex-1 flex items-center justify-center relative">
-                <div className="h-40 w-40">
-                     <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={truckUtilizationData}
-                                innerRadius={40}
-                                outerRadius={60}
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {truckUtilizationData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                            </Pie>
-                        </PieChart>
-                     </ResponsiveContainer>
-                </div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-bold text-slate-800">78%</span>
-                    <span className="text-[10px] text-slate-400 uppercase tracking-widest">Active</span>
-                </div>
-            </div>
-            
-            <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                   <span className="flex items-center gap-2 text-slate-600">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Utilized
-                   </span>
-                   <span className="font-bold text-slate-800">7 Trucks</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                   <span className="flex items-center gap-2 text-slate-600">
-                      <div className="w-2 h-2 rounded-full bg-slate-300"></div> Idle
-                   </span>
-                   <span className="font-bold text-slate-800">2 Trucks</span>
-                </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Peak Profitable Routes */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-slate-800 mb-4">Peak Profitable Routes</h3>
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <span className="bg-white p-1.5 rounded border border-slate-200 text-xs font-bold text-slate-500">#1</span>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">Johannesburg → Cape Town</p>
-                                <p className="text-xs text-slate-500">Avg. R14,500 per trip</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <span className="block text-emerald-600 font-bold text-sm">High Demand</span>
-                            <span className="text-[10px] text-slate-400">12 loads this week</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <span className="bg-white p-1.5 rounded border border-slate-200 text-xs font-bold text-slate-500">#2</span>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">Durban → Johannesburg</p>
-                                <p className="text-xs text-slate-500">Avg. R9,200 per trip</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <span className="block text-blue-600 font-bold text-sm">Steady</span>
-                            <span className="text-[10px] text-slate-400">8 loads this week</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-slate-800 mb-4">Recent Activity</h3>
-                <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-start pb-4 border-b border-slate-50 last:border-0">
-                    <div className="bg-slate-100 p-2 rounded-lg mr-4">
-                        <Clock size={16} className="text-slate-500" />
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-slate-800">New load match found</p>
-                        <p className="text-xs text-slate-500 mt-1">Johannesburg to Durban • Refrigerated</p>
-                        <p className="text-xs text-slate-400 mt-1">2 hours ago</p>
-                    </div>
-                    </div>
-                ))}
-                </div>
-            </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Shipper Dashboard logic
-  if (role === 'shipper' && verificationStatus !== 'verified') {
-      return (
-        <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
-          <AlertTriangle className="mx-auto text-amber-500 mb-4" size={48} />
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Customer Verification Required</h2>
-          <p className="text-slate-600">Please complete the customer registration to request quotes and book trucks.</p>
-        </div>
-      );
-  }
-
-  return (
-    <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold text-slate-800">Shipper Dashboard</h2>
           <button 
@@ -1024,7 +862,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                  />
                              </div>
                              <div>
-                                 <label className="block text-sm font-medium text-slate-700 mb-1">Weight (Tons)</label>
+                                 <label className="block text-sm font-medium text-slate-700 mb-1">Weight (Kgs)</label>
                                  <input 
                                     type="number" 
                                     placeholder="0" 
@@ -1034,6 +872,59 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     required
                                  />
                              </div>
+                         </div>
+
+                         {/* Dimensions Toggle and Inputs */}
+                         <div>
+                            <label className="flex items-center cursor-pointer gap-2 mb-3">
+                                <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                    checked={quoteForm.includeDims}
+                                    onChange={(e) => setQuoteForm({...quoteForm, includeDims: e.target.checked})}
+                                />
+                                <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                    <Box size={16} /> Include Dimensions (Optional)
+                                </span>
+                            </label>
+                            
+                            {quoteForm.includeDims && (
+                                <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Length (cm)</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0" 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                            value={quoteForm.length}
+                                            onChange={(e) => setQuoteForm({...quoteForm, length: e.target.value})}
+                                            required={quoteForm.includeDims}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Width (cm)</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0" 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                            value={quoteForm.width}
+                                            onChange={(e) => setQuoteForm({...quoteForm, width: e.target.value})}
+                                            required={quoteForm.includeDims}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Height (cm)</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0" 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                            value={quoteForm.height}
+                                            onChange={(e) => setQuoteForm({...quoteForm, height: e.target.value})}
+                                            required={quoteForm.includeDims}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                          </div>
 
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1135,5 +1026,3 @@ const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 };
-
-export default Dashboard;

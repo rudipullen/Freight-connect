@@ -189,6 +189,11 @@ export interface QuoteRequest {
   date: string;
   status: 'Open' | 'Booked' | 'Closed';
   createdAt: string;
+  dimensions?: {
+      length: number;
+      width: number;
+      height: number;
+  };
 }
 
 export interface QuoteOffer {

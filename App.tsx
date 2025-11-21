@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { 
   Truck, 
@@ -10,7 +9,7 @@ import {
   PlusCircle, 
   FileText, 
   User,
-  LogOut,
+  LogOut, 
   Menu,
   X,
   Bot,
@@ -21,7 +20,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { UserRole, Listing, Dispute, DisputeEvidence, Booking, BookingStatus, QuoteRequest, QuoteOffer, Review } from './types';
-import Dashboard from './components/Dashboard';
+import { Dashboard } from './components/Dashboard';
 import Marketplace from './components/Marketplace';
 import AdminPanel from './components/AdminPanel';
 import MyBookings from './components/MyBookings';

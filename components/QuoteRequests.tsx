@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { QuoteRequest, QuoteOffer, UserRole } from '../types';
 import { DollarSign, Send, X, CheckCircle, Search, Package, ChevronDown, ChevronUp, CreditCard, MapPin, ShieldCheck, FileText, Percent, Radio, Globe, Clock } from 'lucide-react';
@@ -212,8 +211,14 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                        </div>
                        <div className="flex justify-between">
                           <span className="text-slate-500">Weight</span>
-                          <span className="font-medium text-slate-700">{req.weight} Tons</span>
+                          <span className="font-medium text-slate-700">{req.weight.toLocaleString()} Kgs</span>
                        </div>
+                       {req.dimensions && (
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Dimensions</span>
+                                <span className="font-medium text-slate-700 text-xs">{req.dimensions.length}x{req.dimensions.width}x{req.dimensions.height} cm</span>
+                            </div>
+                       )}
                     </div>
                   </div>
                   <div className="p-4 border-t border-slate-100 bg-slate-50/50">
@@ -246,7 +251,12 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                             </span>
                         </div>
                         <p className="text-sm text-slate-500">
-                            {req.vehicleType} • {req.weight} Tons • {new Date(req.date).toLocaleDateString()}
+                            {req.vehicleType} • {req.weight.toLocaleString()} Kgs • {new Date(req.date).toLocaleDateString()}
+                            {req.dimensions && (
+                                <span className="ml-2 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {req.dimensions.length}x{req.dimensions.width}x{req.dimensions.height} cm
+                                </span>
+                            )}
                         </p>
                         <p className="text-xs text-slate-400 mt-0.5">{req.serviceCategory}</p>
                      </div>
@@ -348,12 +358,18 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                         <span className="font-medium text-slate-800">{selectedRequest.vehicleType}</span>
                     </div>
                     <div className="flex justify-between">
+                        <span className="text-slate-500">Cargo Details</span>
+                        <span className="font-medium text-slate-800">{selectedRequest.cargoType} • {selectedRequest.weight.toLocaleString()} Kgs</span>
+                    </div>
+                     {selectedRequest.dimensions && (
+                        <div className="flex justify-between">
+                            <span className="text-slate-500">Dimensions</span>
+                            <span className="font-medium text-slate-800">{selectedRequest.dimensions.length}x{selectedRequest.dimensions.width}x{selectedRequest.dimensions.height} cm</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between">
                         <span className="text-slate-500">Service Type</span>
                         <span className="font-medium text-slate-800">{selectedRequest.serviceCategory}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-slate-500">Collection</span>
-                        <span className="font-medium text-slate-800">{selectedRequest.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}</span>
                     </div>
                 </div>
                 
@@ -371,7 +387,6 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                               required
                             />
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">Customer will see a marked-up price (approx. R {offerAmount ? (parseFloat(offerAmount) * 1.1).toFixed(0) : '0'})</p>
                     </div>
 
                     <div>
