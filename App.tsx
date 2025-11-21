@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Truck, 
   Package, 
@@ -61,6 +61,11 @@ const App: React.FC = () => {
     { role: 'model', text: "Hi! I'm the FreightConnect AI. Ask me about route pricing, document requirements, or vehicle types."}
   ]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   // Handlers
   const handlePostListing = (listing: Listing) => {
@@ -129,7 +134,7 @@ const App: React.FC = () => {
           loadingPhotoUrl: mockUrl,
           truckSealed: isSealed,
           sealNumber: sealNumber,
-          collectedAt: new Date().toLocaleString(),
+          collectedAt: new Date().toISOString(),
           collectionLocation: location
         } : b
       ));
@@ -208,7 +213,7 @@ const App: React.FC = () => {
           signatureUrl: signature,
           deliveryPhotoUrl: offloadUrl,
           status: BookingStatus.DELIVERED,
-          deliveredAt: new Date().toLocaleString(),
+          deliveredAt: new Date().toISOString(),
           deliveryLocation: location
         } : b
       ));
@@ -268,7 +273,8 @@ const App: React.FC = () => {
       weight: parseFloat(form.weight),
       date: form.date,
       status: 'Open',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      dimensions: form.dimensions // Capture dimensions from form
     };
 
     setQuoteRequests(prev => [newRequest, ...prev]);
@@ -310,6 +316,9 @@ const App: React.FC = () => {
      // 3. Create Booking with Waybill and OTP
      const request = quoteRequests.find(r => r.id === offer.requestId);
      if (request) {
+         const baseRate = offer.amount;
+         const price = baseRate * 1.1; // 10% Markup
+
          const newBooking: Booking = {
              id: `b${Date.now()}`,
              listingId: 'manual', // No listing for quotes
@@ -321,37 +330,26 @@ const App: React.FC = () => {
              origin: addresses?.collection || request.origin,
              destination: addresses?.delivery || request.destination,
              pickupDate: request.date,
-             baseRate: offer.amount,
-             price: offer.amount * 1.1, // Add default markup
-             waybillNumber: `WB-${Math.floor(100000 + Math.random() * 900000)}`, // Auto-generate waybill
-             deliveryOtp: Math.floor(100000 + Math.random() * 900000).toString(), // 6-digit OTP
-             
-             // Mock Contact Details generated on booking creation
+             price: price,
+             baseRate: baseRate,
+             waybillNumber: `WB-${Date.now().toString().substr(-8)}`,
+             deliveryOtp: Math.floor(100000 + Math.random() * 900000).toString(),
              shipperName: request.shipperName,
-             shipperPhone: '+27 82 555 0101', // Mock
-             shipperEmail: 'shipper@example.com',
-             carrierName: offer.carrierName,
-             carrierPhone: '+27 83 555 0202', // Mock
-             carrierEmail: 'carrier@example.com',
-             contactRevealed: false
+             carrierName: offer.carrierName
          };
-         setBookings(prev => [newBooking, ...prev]);
          
+         setBookings(prev => [newBooking, ...prev]);
+
          setNotifications(prev => [{
             id: Date.now(),
-            text: `Booking Confirmed: Waybill #${newBooking.waybillNumber} generated. Delivery OTP sent to shipper.`,
+            text: `Booking Confirmed: #${newBooking.id} (${newBooking.origin} -> ${newBooking.destination})`,
             time: "Just now"
          }, ...prev]);
      }
   };
 
-  const handleDeclineOffer = (offerId: string) => {
-      setQuoteOffers(prev => prev.map(o => o.id === offerId ? { ...o, status: 'Declined' } : o));
-  };
-
-
-  // AI Logic
-  const handleSendMessage = async () => {
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!chatInput.trim()) return;
 
     const userMsg = chatInput;
@@ -359,75 +357,68 @@ const App: React.FC = () => {
     setChatInput("");
     setIsAiLoading(true);
 
-    // Context for AI
-    const context = `User Role: ${role}. 
-    Current Carrier Status: ${carrierStatus}.
-    Available Listings: ${listings.length}.
-    List of cities served: ${listings.map(l => l.origin).join(', ')}.
-    `;
-
-    // Get Location
-    let location = undefined;
-    try {
-       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {timeout: 5000});
-       });
-       location = {
-         lat: pos.coords.latitude,
-         lng: pos.coords.longitude
-       };
-    } catch (e) {
-       // Ignore location error or handle gracefully
-       console.log("Location not available for chat grounding");
-    }
-
-    const response = await getLogisticsAdvice(userMsg, context, location);
+    // Context building
+    const context = `User Role: ${role}. Current listings available: ${listings.length}.`;
     
-    setChatMessages(prev => [...prev, { role: 'model', text: response.text, groundingChunks: response.groundingChunks }]);
+    const response = await getLogisticsAdvice(userMsg, context);
+    
+    setChatMessages(prev => [...prev, { 
+        role: 'model', 
+        text: response.text,
+        groundingChunks: response.groundingChunks
+    }]);
     setIsAiLoading(false);
   };
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard 
+    if (role === 'admin') {
+       return <AdminPanel disputes={disputes} onResolveDispute={handleResolveDispute} onVerifyCarrier={handleVerifyCarrier} />;
+    }
+
+    if (activeTab === 'dashboard') {
+      return (
+        <Dashboard 
           role={role} 
-          verificationStatus={role === 'carrier' ? carrierStatus : shipperStatus}
           isPosting={false}
-          listings={listings}
+          verificationStatus={role === 'carrier' ? carrierStatus : shipperStatus}
           notifications={notifications}
           quoteRequests={quoteRequests}
           quoteOffers={quoteOffers}
           onRequestQuote={handleRequestQuote}
-        />;
-      case 'post-load':
-        return <Dashboard 
+        />
+      );
+    }
+
+    if (activeTab === 'marketplace') {
+      if (role === 'carrier' && carrierStatus !== 'verified') {
+         return <CarrierOnboarding onComplete={() => setCarrierStatus('pending')} />;
+      }
+      return (
+        <Marketplace 
+          role={role} 
+          listings={listings} 
+          userEntityId={role === 'carrier' ? 'c1' : 's1'}
+        />
+      );
+    }
+    
+    if (activeTab === 'post-load') {
+       return (
+         <Dashboard 
            role={role} 
-           verificationStatus={carrierStatus}
            isPosting={true} 
+           verificationStatus={carrierStatus}
            listings={listings}
            onPostListing={handlePostListing}
            onUpdateListing={handleUpdateListing}
            onDeleteListing={handleDeleteListing}
-        />;
-      case 'marketplace':
-        return <Marketplace 
-           listings={listings} 
-           role={role}
-           userEntityId={role === 'carrier' ? 'c1' : 's1'}
-        />;
-      case 'quotes':
-        return <QuoteRequests 
-           role={role}
-           requests={quoteRequests} 
-           offers={quoteOffers}
-           shipperId="s1"
-           onSubmitOffer={handleSubmitOffer} 
-           onAcceptOffer={handleAcceptOffer}
-           onDeclineOffer={handleDeclineOffer}
-        />;
-      case 'bookings':
-        return <MyBookings 
+         />
+       );
+    }
+
+    if (activeTab === 'bookings') {
+       return (
+         <MyBookings 
            role={role} 
            disputes={disputes}
            bookings={bookings}
@@ -438,356 +429,291 @@ const App: React.FC = () => {
            onRevealContact={handleRevealContact}
            onConfirmCollection={handleConfirmCollection}
            onRateBooking={handleRateBooking}
-        />;
-      case 'admin':
-        return <AdminPanel 
-            disputes={disputes} 
-            onResolveDispute={handleResolveDispute} 
-            onVerifyCarrier={handleVerifyCarrier} 
-        />;
-      case 'api':
-        return <ApiIntegration />;
-      case 'carrier-onboarding':
-        return <CarrierOnboarding onComplete={() => {
-           setCarrierStatus('pending');
-           setActiveTab('dashboard');
-           setNotifications(prev => [{
-             id: Date.now(), 
-             text: "Application submitted! Verification in progress.", 
-             time: "Just now"
-           }, ...prev]);
-        }} />;
-      case 'shipper-onboarding':
-        return <ShipperOnboarding onComplete={() => {
-           setShipperStatus('pending');
-           setActiveTab('dashboard');
-           setNotifications(prev => [{
-             id: Date.now(), 
-             text: "Registration submitted! Verification in progress.", 
-             time: "Just now"
-           }, ...prev]);
-        }} />;
-      default:
-        return <Dashboard role={role} verificationStatus={role === 'carrier' ? carrierStatus : shipperStatus} />;
+         />
+       );
     }
+
+    if (activeTab === 'quotes') {
+        return (
+            <QuoteRequests 
+               role={role}
+               shipperId="s1"
+               requests={quoteRequests}
+               offers={quoteOffers}
+               onSubmitOffer={handleSubmitOffer}
+               onAcceptOffer={handleAcceptOffer}
+               onDeclineOffer={(id) => {
+                   setQuoteOffers(prev => prev.map(o => o.id === id ? { ...o, status: 'Declined' } : o));
+               }}
+            />
+        );
+    }
+
+    if (activeTab === 'onboarding') {
+       return role === 'carrier' ? 
+         <CarrierOnboarding onComplete={() => setCarrierStatus('pending')} /> : 
+         <ShipperOnboarding onComplete={() => setShipperStatus('pending')} />;
+    }
+
+    if (activeTab === 'api') {
+        return <ApiIntegration />;
+    }
+
+    return null;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col md:flex-row">
-      {/* Mobile Header */}
-      <div className="md:hidden bg-brand-900 text-white p-4 flex justify-between items-center z-50 sticky top-0 shadow-md">
-        <div className="flex items-center gap-2">
-          <Truck size={24} className="text-emerald-400" />
-          <h1 className="font-bold text-xl tracking-tight">FreightConnect</h1>
-        </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </button>
-      </div>
-
+    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
       {/* Sidebar Navigation */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-40 w-64 bg-brand-900 text-slate-300 transform transition-transform duration-200 ease-in-out md:translate-x-0 md:relative flex flex-col
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <div className="p-6 border-b border-brand-800 hidden md:flex items-center gap-2">
-           <Truck size={28} className="text-emerald-400" />
-           <span className="text-white font-bold text-xl tracking-tight">FreightConnect</span>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
+        <div className="p-6 flex items-center justify-between">
+           <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
+             <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-lg flex items-center justify-center text-slate-900">
+               <Truck size={20} />
+             </div>
+             FreightConnect
+           </div>
+           <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400">
+             <X size={24} />
+           </button>
         </div>
 
-        {/* User Profile Snippet */}
-        <div className="p-6 bg-brand-800/50 mb-2">
-           <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
-                {role === 'admin' ? 'AD' : (role === 'carrier' ? 'SL' : 'AS')}
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm">{role === 'admin' ? 'Admin User' : (role === 'carrier' ? 'Swift Logistics' : 'Acme Supplies')}</p>
-                <p className="text-xs text-brand-300 capitalize">{role} Account</p>
-              </div>
-           </div>
-           
-           {/* Role Toggles */}
-           <div className="flex gap-1 mb-3">
-              <button 
-                onClick={() => setRole('carrier')}
-                className={`text-[10px] px-2 py-1 rounded border ${role === 'carrier' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'border-brand-700 hover:bg-brand-800'}`}
-              >
-                Carrier
-              </button>
-              <button 
-                onClick={() => setRole('shipper')}
-                className={`text-[10px] px-2 py-1 rounded border ${role === 'shipper' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'border-brand-700 hover:bg-brand-800'}`}
-              >
-                Shipper
-              </button>
-              <button 
-                onClick={() => setRole('admin')}
-                className={`text-[10px] px-2 py-1 rounded border ${role === 'admin' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'border-brand-700 hover:bg-brand-800'}`}
-              >
-                Admin
-              </button>
-           </div>
-
-           {/* Debug Controls for Carrier Verification */}
-           {role === 'carrier' && (
-             <div className="pt-3 border-t border-brand-700">
-                <div className="flex justify-between items-center mb-2">
-                   <span className="text-[10px] text-brand-400 uppercase font-bold">Carrier Status</span>
-                   <span className={`text-[10px] px-1.5 py-0.5 rounded-sm capitalize ${
-                     carrierStatus === 'verified' ? 'bg-emerald-500 text-white' : 
-                     carrierStatus === 'pending' ? 'bg-blue-500 text-white' : 'bg-amber-500 text-white'
-                   }`}>
-                     {carrierStatus}
-                   </span>
-                </div>
-                <div className="flex gap-1">
-                   <button 
-                     onClick={() => setCarrierStatus('unverified')}
-                     className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${carrierStatus === 'unverified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
-                   >
-                     Reset
-                   </button>
-                   <button 
-                     onClick={() => setCarrierStatus('verified')}
-                     className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${carrierStatus === 'verified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
-                   >
-                     Verify
-                   </button>
-                </div>
-             </div>
-           )}
-
-           {/* Debug Controls for Shipper Verification */}
-           {role === 'shipper' && (
-             <div className="pt-3 border-t border-brand-700">
-                <div className="flex justify-between items-center mb-2">
-                   <span className="text-[10px] text-brand-400 uppercase font-bold">Shipper Status</span>
-                   <span className={`text-[10px] px-1.5 py-0.5 rounded-sm capitalize ${
-                     shipperStatus === 'verified' ? 'bg-emerald-500 text-white' : 
-                     shipperStatus === 'pending' ? 'bg-blue-500 text-white' : 'bg-amber-500 text-white'
-                   }`}>
-                     {shipperStatus}
-                   </span>
-                </div>
-                <div className="flex gap-1">
-                   <button 
-                     onClick={() => setShipperStatus('unverified')}
-                     className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${shipperStatus === 'unverified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
-                   >
-                     Reset
-                   </button>
-                   <button 
-                     onClick={() => setShipperStatus('verified')}
-                     className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${shipperStatus === 'verified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
-                   >
-                     Verify
-                   </button>
-                </div>
-             </div>
-           )}
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <button 
-            onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800'}`}
-          >
-            <LayoutDashboard size={20} />
-            <span className="font-medium">Dashboard</span>
-          </button>
-          
-          {role === 'carrier' && (
-             <button 
-              onClick={() => { setActiveTab('post-load'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'post-load' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800'}`}
-            >
-              <PlusCircle size={20} />
-              <span className="font-medium">Post Empty Leg</span>
-            </button>
-          )}
-
-          <button 
-            onClick={() => { setActiveTab('marketplace'); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'marketplace' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800'}`}
-          >
-            <Search size={20} />
-            <span className="font-medium">Find Loads</span>
-          </button>
-          
-          {/* Quote Requests Tab - Now visible for both Carriers and Shippers */}
-          {(role === 'carrier' || role === 'shipper') && (
-             <button 
-              onClick={() => { setActiveTab('quotes'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'quotes' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800'}`}
-            >
-              <MessageSquare size={20} />
-              <span className="font-medium">Requested Quotes</span>
-            </button>
-          )}
-
-          <button 
-            onClick={() => { setActiveTab('bookings'); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'bookings' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800'}`}
-          >
-            <FileText size={20} />
-            <span className="font-medium">My Bookings</span>
-          </button>
-
-          {/* Developer / API Tab */}
-          {(role === 'carrier' || role === 'shipper') && (
+        <div className="px-4 py-2">
+          <div className="bg-slate-800 rounded-lg p-1 flex mb-6">
             <button 
-              onClick={() => { setActiveTab('api'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'api' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800'}`}
+              onClick={() => { setRole('shipper'); setActiveTab('dashboard'); }}
+              className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${role === 'shipper' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
-              <Code size={20} />
-              <span className="font-medium">API Access</span>
+              Shipper
             </button>
+            <button 
+              onClick={() => { setRole('carrier'); setActiveTab('dashboard'); }}
+              className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${role === 'carrier' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              Carrier
+            </button>
+             <button 
+              onClick={() => { setRole('admin'); setActiveTab('admin'); }}
+              className={`flex-1 text-xs font-bold py-2 rounded-md transition-all ${role === 'admin' ? 'bg-slate-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              Admin
+            </button>
+          </div>
+        </div>
+
+        <nav className="px-4 space-y-2">
+          {role !== 'admin' && (
+            <>
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-white/10 text-white font-medium' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                <LayoutDashboard size={20} />
+                Dashboard
+              </button>
+              
+              <button 
+                onClick={() => setActiveTab('marketplace')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'marketplace' ? 'bg-white/10 text-white font-medium' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                <Search size={20} />
+                {role === 'carrier' ? 'Find Loads' : 'My Listings'}
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('quotes')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'quotes' ? 'bg-white/10 text-white font-medium' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                <MessageSquare size={20} />
+                Quotes
+                {quoteOffers.filter(o => o.status === 'Pending').length > 0 && role === 'shipper' && (
+                    <span className="ml-auto bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {quoteOffers.filter(o => o.status === 'Pending').length}
+                    </span>
+                )}
+                {quoteRequests.filter(r => r.status === 'Open').length > 0 && role === 'carrier' && (
+                    <span className="ml-auto bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {quoteRequests.filter(r => r.status === 'Open').length}
+                    </span>
+                )}
+              </button>
+
+              {role === 'carrier' && (
+                <button 
+                  onClick={() => setActiveTab('post-load')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'post-load' ? 'bg-white/10 text-white font-medium' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                >
+                  <PlusCircle size={20} />
+                  Post Empty Leg
+                </button>
+              )}
+
+              <button 
+                onClick={() => setActiveTab('bookings')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'bookings' ? 'bg-white/10 text-white font-medium' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                <Package size={20} />
+                Active Jobs
+                {bookings.filter(b => b.status !== 'Completed').length > 0 && (
+                   <span className="ml-auto bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {bookings.filter(b => b.status !== 'Completed').length}
+                   </span>
+                )}
+              </button>
+
+              <button 
+                 onClick={() => setActiveTab('api')}
+                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'api' ? 'bg-white/10 text-white font-medium' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                 <Code size={20} />
+                 API & Webhooks
+              </button>
+            </>
           )}
 
-          {/* Carrier Verification Link */}
-          {role === 'carrier' && carrierStatus === 'unverified' && (
-             <button 
-               onClick={() => { setActiveTab('carrier-onboarding'); setIsMobileMenuOpen(false); }}
-               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'carrier-onboarding' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800 text-amber-400'}`}
-             >
-               <ShieldCheck size={20} />
-               <span className="font-medium">Verify Account</span>
-             </button>
-          )}
-
-          {/* Shipper Verification Link */}
-          {role === 'shipper' && shipperStatus === 'unverified' && (
-             <button 
-               onClick={() => { setActiveTab('shipper-onboarding'); setIsMobileMenuOpen(false); }}
-               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'shipper-onboarding' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800 text-amber-400'}`}
-             >
-               <ShieldCheck size={20} />
-               <span className="font-medium">Verify Customer</span>
-             </button>
-          )}
-          
           {role === 'admin' && (
              <button 
-               onClick={() => { setActiveTab('admin'); setIsMobileMenuOpen(false); }}
-               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'admin' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800'}`}
-             >
-               <ShieldCheck size={20} />
-               <span className="font-medium">Admin Portal</span>
-             </button>
+                onClick={() => setActiveTab('admin')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'admin' ? 'bg-white/10 text-white font-medium' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                <ShieldCheck size={20} />
+                Admin Panel
+                {disputes.filter(d => d.status === 'Open').length > 0 && (
+                   <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {disputes.filter(d => d.status === 'Open').length}
+                   </span>
+                )}
+              </button>
           )}
         </nav>
 
-        <div className="p-4 border-t border-brand-800">
-           <button 
-             onClick={() => alert('Logging out...')}
-             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-brand-800 text-slate-400 hover:text-white transition-colors"
-           >
-             <LogOut size={20} />
-             <span className="font-medium">Sign Out</span>
-           </button>
+        <div className="absolute bottom-6 left-6 right-6">
+          <div className="bg-slate-800 rounded-xl p-4 mb-4">
+             <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center">
+                   <User size={20} className="text-slate-300" />
+                </div>
+                <div>
+                   <p className="text-sm font-bold text-white">Demo User</p>
+                   <p className="text-xs text-slate-400 capitalize">{role} Account</p>
+                </div>
+             </div>
+             {(role === 'carrier' ? carrierStatus : shipperStatus) !== 'verified' && role !== 'admin' && (
+                 <button 
+                   onClick={() => setActiveTab('onboarding')}
+                   className="w-full mt-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2 rounded-lg transition-colors"
+                 >
+                    Verify Account
+                 </button>
+             )}
+          </div>
+          <button className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">
+            <LogOut size={18} />
+            Sign Out
+          </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto h-screen">
-        {/* Top Navigation for Mobile is covered by fixed sidebar styling above */}
-        <div className="p-6 md:p-10 max-w-7xl mx-auto">
-          {renderContent()}
+      {/* Main Content */}
+      <main className="flex-1 md:ml-0 transition-all duration-300">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-40">
+           <div className="flex items-center gap-2 font-bold text-slate-800">
+             <Truck className="text-emerald-600" size={24} />
+             FreightConnect
+           </div>
+           <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-600">
+             <Menu size={24} />
+           </button>
+        </div>
+
+        <div className="p-4 md:p-8 max-w-7xl mx-auto">
+           {renderContent()}
         </div>
       </main>
 
-      {/* AI Chat Button */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button 
-          onClick={() => setIsChatOpen(!isChatOpen)}
-          className="bg-brand-900 hover:bg-brand-800 text-white p-4 rounded-full shadow-lg shadow-brand-900/30 transition-all transform hover:scale-105 flex items-center gap-2"
-        >
-          <Bot size={24} />
-          <span className="font-bold hidden md:inline">AI Assistant</span>
-        </button>
-      </div>
-
-      {/* Chat Window */}
-      {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-40 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 max-h-[600px]">
-           <div className="bg-brand-900 p-4 flex justify-between items-center text-white">
-              <div className="flex items-center gap-2">
-                 <Bot size={20} />
-                 <h3 className="font-bold">Logistics Assistant</h3>
-              </div>
-              <button onClick={() => setIsChatOpen(false)} className="text-slate-300 hover:text-white">
-                 <X size={20} />
-              </button>
-           </div>
-           
-           <div className="flex-1 p-4 overflow-y-auto h-80 bg-slate-50 space-y-4">
-              {chatMessages.map((msg, idx) => (
-                <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                   <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-                     msg.role === 'user' 
-                       ? 'bg-brand-600 text-white rounded-tr-none' 
-                       : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
-                   }`}>
-                      {msg.text}
-                   </div>
-                   {msg.groundingChunks && msg.groundingChunks.length > 0 && (
-                      <div className={`flex flex-wrap gap-2 mt-2 max-w-[85%] ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          {msg.groundingChunks.map((chunk, i) => {
-                              if (chunk.web?.uri) {
-                                  return (
-                                    <a key={i} href={chunk.web.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full hover:bg-slate-200 transition-colors border border-slate-200">
-                                        <ExternalLink size={10} />
-                                        <span className="truncate max-w-[150px]">{chunk.web.title || 'Source'}</span>
-                                    </a>
-                                  );
-                              }
-                              if (chunk.maps?.uri) {
-                                  return (
-                                    <a key={i} href={chunk.maps.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full hover:bg-emerald-100 transition-colors border border-emerald-200">
-                                        <MapPin size={10} />
-                                        <span className="truncate max-w-[150px]">{chunk.maps.title || 'Google Maps'}</span>
-                                    </a>
-                                  );
-                              }
-                              return null;
-                          })}
+      {/* AI Assistant Floating Button & Chat */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+          {isChatOpen && (
+              <div className="bg-white rounded-2xl shadow-2xl w-80 md:w-96 border border-slate-200 overflow-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300" style={{height: '500px'}}>
+                  <div className="bg-slate-900 p-4 flex items-center justify-between text-white">
+                      <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-white/10 rounded-lg">
+                              <Bot size={20} className="text-emerald-400" />
+                          </div>
+                          <div>
+                              <h4 className="font-bold text-sm">Logistics AI</h4>
+                              <p className="text-[10px] text-slate-400">Powered by Gemini</p>
+                          </div>
                       </div>
-                   )}
-                </div>
-              ))}
-              {isAiLoading && (
-                <div className="flex justify-start">
-                   <div className="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                   </div>
-                </div>
-              )}
-           </div>
+                      <button onClick={() => setIsChatOpen(false)} className="text-slate-400 hover:text-white">
+                          <X size={18} />
+                      </button>
+                  </div>
+                  
+                  <div className="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-4">
+                      {chatMessages.map((msg, idx) => (
+                          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[85%] rounded-2xl p-3 text-sm ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}`}>
+                                  {msg.text}
+                                  {msg.groundingChunks && msg.groundingChunks.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-slate-200/50">
+                                      <p className="text-[10px] font-bold mb-1 opacity-70">Sources:</p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {msg.groundingChunks.map((chunk, i) => {
+                                          if (chunk.web?.uri) {
+                                            return (
+                                              <a key={i} href={chunk.web.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] bg-black/10 hover:bg-black/20 px-2 py-1 rounded transition-colors text-inherit no-underline">
+                                                <ExternalLink size={10} /> {chunk.web.title || 'Link'}
+                                              </a>
+                                            )
+                                          }
+                                          return null;
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                              </div>
+                          </div>
+                      ))}
+                      {isAiLoading && (
+                          <div className="flex justify-start">
+                              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-3 shadow-sm flex items-center gap-2">
+                                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
+                                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-100"></div>
+                                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-200"></div>
+                              </div>
+                          </div>
+                      )}
+                      <div ref={chatEndRef} />
+                  </div>
 
-           <div className="p-3 bg-white border-t border-slate-100">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-                  placeholder="Ask about rates, routes..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
-                <button 
-                  onClick={handleSendMessage}
-                  disabled={!chatInput.trim() || isAiLoading}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-brand-600 hover:bg-brand-50 rounded-lg disabled:opacity-50"
-                >
-                   <Send size={18} />
-                </button>
+                  <form onSubmit={handleChatSubmit} className="p-3 bg-white border-t border-slate-100 flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Ask about routes, docs..." 
+                        className="flex-1 bg-slate-100 border-transparent focus:bg-white border focus:border-emerald-500 rounded-lg px-4 py-2.5 text-sm focus:outline-none transition-all"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                      />
+                      <button 
+                        type="submit"
+                        disabled={!chatInput.trim() || isAiLoading}
+                        className={`p-2.5 rounded-lg text-white transition-all ${!chatInput.trim() ? 'bg-slate-300' : 'bg-emerald-600 hover:bg-emerald-700 shadow-md'}`}
+                      >
+                          <Send size={18} />
+                      </button>
+                  </form>
               </div>
-           </div>
-        </div>
-      )}
+          )}
+          
+          <button 
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className="w-14 h-14 bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
+          >
+            <MessageSquare size={24} />
+          </button>
+      </div>
     </div>
   );
 };

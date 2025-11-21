@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserRole, Listing, QuoteRequest, QuoteOffer } from '../types';
-import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck, Box } from 'lucide-react';
+import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck, Box, Star } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Pie, Cell } from 'recharts';
 import CitySearchInput from './CitySearchInput';
 import { SERVICE_CATEGORIES, VEHICLE_OPTIONS } from '../constants';
@@ -40,11 +40,6 @@ const marketPriceData = [
     { day: 'Fri', price: 1250 },
     { day: 'Sat', price: 1300 },
     { day: 'Sun', price: 1350 },
-];
-
-const truckUtilizationData = [
-    { name: 'Utilized', value: 78, color: '#10b981' },
-    { name: 'Idle', value: 22, color: '#e2e8f0' }
 ];
 
 const STANDARD_MARKUP = 0.10; // 10%
@@ -413,7 +408,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Service Category Selection */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Service Type</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Service Category</label>
                     <select 
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         value={postForm.serviceCategory}
@@ -427,7 +422,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Service Type Section */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Collection Method</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
                     <div className="flex gap-4">
                     <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
                         <input 
@@ -966,7 +961,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                         {/* Service Category */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Service Type</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Service Category</label>
                             <select 
                                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 value={quoteForm.serviceCategory}
@@ -978,8 +973,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </select>
                         </div>
 
+                        {/* Service Type - Fixed Labels to match Request */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Collection Method</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
                             <div className="flex gap-4">
                                 <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
                                     <input 
@@ -991,7 +987,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     className="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500"
                                     />
                                     <div className="ml-3">
-                                        <span className="block text-sm font-medium text-slate-800">Collect & Deliver</span>
+                                        <span className="block text-sm font-medium text-slate-800">Door-to-Door</span>
+                                        <span className="block text-xs text-slate-500">Collect & Deliver</span>
                                     </div>
                                 </label>
                                 <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
@@ -1005,6 +1002,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     />
                                     <div className="ml-3">
                                         <span className="block text-sm font-medium text-slate-800">Depot-to-Depot</span>
+                                        <span className="block text-xs text-slate-500">Hub-to-Hub</span>
                                     </div>
                                 </label>
                             </div>
