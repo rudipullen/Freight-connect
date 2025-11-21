@@ -96,6 +96,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot',
     availabilityType: 'Full' as 'Full' | 'Shared Space',
     spaceDetails: '',
+    availableTons: '',
+    availablePallets: '',
     includesLoadingAssist: false,
     gitCover: false,
     gitLimit: '',
@@ -130,6 +132,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           vehicleType: finalVehicleType,
           serviceCategory: postForm.serviceCategory,
           serviceType: postForm.serviceType,
+          availableTons: parseFloat(postForm.availableTons) || 0,
+          availablePallets: parseFloat(postForm.availablePallets) || 0,
           availableDetails: postForm.availabilityType === 'Shared Space' ? postForm.spaceDetails : undefined,
           includesLoadingAssist: postForm.includesLoadingAssist,
           gitCover: postForm.gitCover,
@@ -154,8 +158,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         vehicleType: finalVehicleType,
         serviceCategory: postForm.serviceCategory,
         serviceType: postForm.serviceType,
-        availableTons: 0, // Default
-        availablePallets: 0, // Default
+        availableTons: parseFloat(postForm.availableTons) || 0,
+        availablePallets: parseFloat(postForm.availablePallets) || 0,
         availableDetails: postForm.availabilityType === 'Shared Space' ? postForm.spaceDetails : undefined,
         includesLoadingAssist: postForm.includesLoadingAssist,
         gitCover: postForm.gitCover,
@@ -181,6 +185,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       serviceType: 'Door-to-Door',
       availabilityType: 'Full',
       spaceDetails: '',
+      availableTons: '',
+      availablePallets: '',
       includesLoadingAssist: false,
       gitCover: false,
       gitLimit: '',
@@ -274,6 +280,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       serviceType: route.serviceType || 'Door-to-Door',
       availabilityType: route.availableDetails ? 'Shared Space' : 'Full',
       spaceDetails: route.availableDetails || '',
+      availableTons: route.availableTons?.toString() || '',
+      availablePallets: route.availablePallets?.toString() || '',
       includesLoadingAssist: route.includesLoadingAssist || false,
       gitCover: route.gitCover || false,
       gitLimit: route.gitLimit ? route.gitLimit.toString() : '',
@@ -372,6 +380,76 @@ export const Dashboard: React.FC<DashboardProps> = ({
                        </div>
                    )}
                </div>
+               
+               {/* Load Capacity Section */}
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                   <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                       <Box size={16} /> Load Capacity & Availability
+                   </h4>
+                   
+                   {/* Load Type Toggle */}
+                   <div className="flex gap-4 mb-4">
+                       <label className="flex items-center cursor-pointer">
+                           <input 
+                               type="radio" 
+                               name="availabilityType"
+                               value="Full"
+                               checked={postForm.availabilityType === 'Full'}
+                               onChange={() => setPostForm({...postForm, availabilityType: 'Full'})}
+                               className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                           />
+                           <span className="ml-2 text-sm font-medium text-slate-700">Full Truck Load</span>
+                       </label>
+                       <label className="flex items-center cursor-pointer">
+                           <input 
+                               type="radio" 
+                               name="availabilityType"
+                               value="Shared Space"
+                               checked={postForm.availabilityType === 'Shared Space'}
+                               onChange={() => setPostForm({...postForm, availabilityType: 'Shared Space'})}
+                               className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                           />
+                           <span className="ml-2 text-sm font-medium text-slate-700">Part Load / Shared Space</span>
+                       </label>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-4 mb-4">
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 mb-1">Available Tons</label>
+                           <input 
+                               type="number" 
+                               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                               placeholder="e.g. 34"
+                               value={postForm.availableTons}
+                               onChange={(e) => setPostForm({...postForm, availableTons: e.target.value})}
+                           />
+                       </div>
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 mb-1">Available Pallets</label>
+                           <input 
+                               type="number" 
+                               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                               placeholder="e.g. 26"
+                               value={postForm.availablePallets}
+                               onChange={(e) => setPostForm({...postForm, availablePallets: e.target.value})}
+                           />
+                       </div>
+                   </div>
+
+                   {postForm.availabilityType === 'Shared Space' && (
+                       <div className="animate-in fade-in slide-in-from-top-2">
+                           <label className="block text-xs font-bold text-slate-500 mb-1">Space Details / Constraints</label>
+                           <textarea 
+                               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                               placeholder="Describe the available space (e.g. 3m deck space, 4 pallet spots remaining)..."
+                               value={postForm.spaceDetails}
+                               onChange={(e) => setPostForm({...postForm, spaceDetails: e.target.value})}
+                               rows={2}
+                           />
+                       </div>
+                   )}
+               </div>
+
                <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Net Earnings (ZAR)</label>
