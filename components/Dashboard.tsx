@@ -5,7 +5,7 @@ import { UserRole, Listing, QuoteRequest, QuoteOffer } from '../types';
 import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Pie, Cell } from 'recharts';
 import CitySearchInput from './CitySearchInput';
-import { SERVICE_CATEGORIES } from '../constants';
+import { SERVICE_CATEGORIES, VEHICLE_OPTIONS } from '../constants';
 
 interface DashboardProps {
   role: UserRole;
@@ -46,26 +46,6 @@ const marketPriceData = [
 const truckUtilizationData = [
     { name: 'Utilized', value: 78, color: '#10b981' },
     { name: 'Idle', value: 22, color: '#e2e8f0' }
-];
-
-const VEHICLE_OPTIONS = [
-  // Medium Vehicles
-  '4-Ton Truck (Closed / Curtain Side)',
-  '8-Ton Truck',
-  '10-Ton Truck',
-  'Refrigerated Truck (Small–Medium)',
-  // Heavy Vehicles
-  'Interlink - Tautliner / Curtain Side',
-  'Interlink - Flatbed',
-  'Interlink - Drop Side',
-  'Superlink',
-  'Tri-Axle Trailer',
-  'Refrigerated Interlink',
-  'Tipper Truck',
-  'Tanker Truck',
-  'Container Truck (20-ft)',
-  'Container Truck (40-ft)',
-  'Other'
 ];
 
 const STANDARD_MARKUP = 0.10; // 10%

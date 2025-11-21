@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock, Users, ShieldCheck } from 'lucide-react';
-import { MOCK_LISTINGS } from '../constants';
+import { MOCK_LISTINGS, VEHICLE_OPTIONS } from '../constants';
 import { Listing, UserRole } from '../types';
 import CitySearchInput from './CitySearchInput';
 
@@ -20,18 +20,37 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
   
   // State for address inputs when booking Door-to-Door
   const [addressDetails, setAddressDetails] = useState({ collection: '', delivery: '' });
+
+  // Filters State
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterVehicle, setFilterVehicle] = useState('');
+  const [filterServiceType, setFilterServiceType] = useState('');
+  const [filterDate, setFilterDate] = useState('');
   
   const filteredListings = listings.filter(l => {
       const matchesSearch = l.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             l.destination.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Privacy Filter: Carriers can only see their own listings
-      if (role === 'carrier' && userEntityId) {
-          return matchesSearch && l.carrierId === userEntityId;
+      if (role === 'carrier' && userEntityId && l.carrierId !== userEntityId) {
+          return false;
       }
 
-      return matchesSearch;
+      // Apply Filters
+      const matchesVehicle = !filterVehicle || l.vehicleType === filterVehicle;
+      const matchesService = !filterServiceType || l.serviceType === filterServiceType;
+      const matchesDate = !filterDate || l.date === filterDate;
+
+      return matchesSearch && matchesVehicle && matchesService && matchesDate;
   });
+
+  const clearFilters = () => {
+    setFilterVehicle('');
+    setFilterServiceType('');
+    setFilterDate('');
+  };
+
+  const activeFiltersCount = [filterVehicle, filterServiceType, filterDate].filter(Boolean).length;
 
   const handleBook = (listing: Listing) => {
     setSelectedListing(listing);
@@ -74,11 +93,74 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
              icon={Search}
              className="flex-1 md:w-64"
           />
-          <button className="p-2 border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50">
+          <button 
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className={`p-2 border rounded-lg flex items-center gap-2 ${isFilterOpen || activeFiltersCount > 0 ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
             <Filter size={20} />
+            {activeFiltersCount > 0 && (
+               <span className="bg-brand-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {activeFiltersCount}
+               </span>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Advanced Filters Panel */}
+      {isFilterOpen && (
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
+           {/* Vehicle Filter */}
+           <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">Vehicle Type</label>
+               <select 
+                  className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={filterVehicle}
+                  onChange={(e) => setFilterVehicle(e.target.value)}
+               >
+                  <option value="">Any Vehicle</option>
+                  {VEHICLE_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+               </select>
+           </div>
+           
+           {/* Service Type Filter */}
+           <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">Service Type</label>
+               <select 
+                   className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                   value={filterServiceType}
+                   onChange={(e) => setFilterServiceType(e.target.value)}
+               >
+                   <option value="">Any Service</option>
+                   <option value="Door-to-Door">Door-to-Door (Collect & Deliver)</option>
+                   <option value="Depot-to-Depot">Depot-to-Depot</option>
+               </select>
+           </div>
+
+           {/* Date Filter */}
+           <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Available Date</label>
+              <input 
+                 type="date" 
+                 className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                 value={filterDate}
+                 onChange={(e) => setFilterDate(e.target.value)}
+              />
+           </div>
+
+           <div className="md:col-span-3 flex justify-end border-t border-slate-200 pt-3 mt-1">
+              <button 
+                 onClick={clearFilters} 
+                 className="text-sm text-slate-500 hover:text-red-600 font-medium px-3 py-1 rounded hover:bg-red-50 transition-colors"
+                 disabled={activeFiltersCount === 0}
+              >
+                Clear Filters
+              </button>
+           </div>
+        </div>
+      )}
 
       {role === 'carrier' && (
           <div className="bg-blue-50 text-blue-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 text-sm border border-blue-100">
@@ -89,106 +171,124 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
 
       {/* Listing Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredListings.map(listing => (
-          <div key={listing.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
-            <div className="p-5 flex-1">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex flex-col gap-1">
-                    <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded w-fit">
-                    {listing.vehicleType}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500">
-                        {listing.serviceCategory}
-                    </span>
-                    {listing.includesLoadingAssist && (
-                        <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-1">
-                            <Users size={12} /> Driver Assists
-                        </span>
-                    )}
-                    {listing.gitCover && (
-                        <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-0.5">
-                            <ShieldCheck size={12} /> GIT: R{listing.gitLimit ? (listing.gitLimit/1000).toFixed(0) + 'k' : 'Included'}
-                        </span>
-                    )}
+        {filteredListings.length === 0 ? (
+            <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-xl">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                   <Search className="text-slate-400" size={32} />
                 </div>
-                <div className="text-right">
-                  <span className="text-emerald-600 font-bold text-lg block">
-                    R {listing.price.toLocaleString()}
-                  </span>
-                  <span className="text-[10px] text-slate-400 uppercase">Inc. VAT</span>
+                <h3 className="text-lg font-bold text-slate-800">No loads found</h3>
+                <p className="text-slate-500">Try adjusting your filters or search terms.</p>
+                {activeFiltersCount > 0 && (
+                    <button 
+                      onClick={clearFilters}
+                      className="mt-4 text-emerald-600 font-bold text-sm hover:underline"
+                    >
+                        Clear all filters
+                    </button>
+                )}
+            </div>
+        ) : (
+          filteredListings.map(listing => (
+            <div key={listing.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+              <div className="p-5 flex-1">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex flex-col gap-1">
+                      <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded w-fit">
+                      {listing.vehicleType}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500">
+                          {listing.serviceCategory}
+                      </span>
+                      {listing.includesLoadingAssist && (
+                          <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-1">
+                              <Users size={12} /> Driver Assists
+                          </span>
+                      )}
+                      {listing.gitCover && (
+                          <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-0.5">
+                              <ShieldCheck size={12} /> GIT: R{listing.gitLimit ? (listing.gitLimit/1000).toFixed(0) + 'k' : 'Included'}
+                          </span>
+                      )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-emerald-600 font-bold text-lg block">
+                      R {listing.price.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-slate-400 uppercase">Inc. VAT</span>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="space-y-4 relative">
-                <div className="absolute left-1.5 top-1.5 bottom-8 w-0.5 bg-slate-200"></div>
                 
-                <div className="flex items-start relative z-10">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 mt-1.5 mr-3 border-2 border-white shadow-sm"></div>
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Origin</p>
-                    <p className="font-semibold text-slate-800">{listing.origin}</p>
-                    {listing.collectionWindow && (
-                        <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Clock size={10} /> {listing.collectionWindow}
-                        </p>
-                    )}
+                <div className="space-y-4 relative">
+                  <div className="absolute left-1.5 top-1.5 bottom-8 w-0.5 bg-slate-200"></div>
+                  
+                  <div className="flex items-start relative z-10">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 mt-1.5 mr-3 border-2 border-white shadow-sm"></div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider">Origin</p>
+                      <p className="font-semibold text-slate-800">{listing.origin}</p>
+                      {listing.collectionWindow && (
+                          <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <Clock size={10} /> {listing.collectionWindow}
+                          </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-start relative z-10">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 mt-1.5 mr-3 border-2 border-white shadow-sm"></div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider">Destination</p>
+                      <p className="font-semibold text-slate-800">{listing.destination}</p>
+                      {listing.deliveryWindow && (
+                          <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <Clock size={10} /> {listing.deliveryWindow}
+                          </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-start relative z-10">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500 mt-1.5 mr-3 border-2 border-white shadow-sm"></div>
+                <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Destination</p>
-                    <p className="font-semibold text-slate-800">{listing.destination}</p>
-                    {listing.deliveryWindow && (
-                        <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Clock size={10} /> {listing.deliveryWindow}
-                        </p>
-                    )}
+                    <p className="text-slate-500">Date</p>
+                    <p className="font-medium flex items-center gap-1">
+                      <Calendar size={14} /> {listing.date}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Transit Time</p>
+                    <p className="font-medium flex items-center gap-1 text-slate-800">
+                      <Clock size={14} /> {listing.transitTime || 'Standard'}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
-                <div>
-                   <p className="text-slate-500">Date</p>
-                   <p className="font-medium flex items-center gap-1">
-                     <Calendar size={14} /> {listing.date}
-                   </p>
+              <div className="bg-slate-50 p-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
+                      {listing.carrierName.substring(0,2)}
+                    </div>
+                    <span className="text-xs font-medium text-slate-600">{listing.carrierName}</span>
                 </div>
-                <div>
-                   <p className="text-slate-500">Transit Time</p>
-                   <p className="font-medium flex items-center gap-1 text-slate-800">
-                     <Clock size={14} /> {listing.transitTime || 'Standard'}
-                   </p>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleViewDetails(listing)}
+                    className="flex-1 border border-slate-300 bg-white text-slate-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                  >
+                    View Details
+                  </button>
+                  <button 
+                    onClick={() => handleBook(listing)}
+                    className="flex-1 bg-brand-900 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-brand-800 transition-colors"
+                  >
+                    Book Load
+                  </button>
                 </div>
               </div>
             </div>
-
-            <div className="bg-slate-50 p-4 border-t border-slate-100">
-               <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
-                    {listing.carrierName.substring(0,2)}
-                  </div>
-                  <span className="text-xs font-medium text-slate-600">{listing.carrierName}</span>
-               </div>
-               <div className="flex gap-2">
-                 <button 
-                   onClick={() => handleViewDetails(listing)}
-                   className="flex-1 border border-slate-300 bg-white text-slate-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
-                 >
-                   View Details
-                 </button>
-                 <button 
-                   onClick={() => handleBook(listing)}
-                   className="flex-1 bg-brand-900 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-brand-800 transition-colors"
-                 >
-                   Book Load
-                 </button>
-               </div>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Details Modal */}

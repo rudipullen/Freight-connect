@@ -18,6 +18,24 @@ export const SERVICE_CATEGORIES = [
   "Cross-border Road Freight"
 ];
 
+export const VEHICLE_OPTIONS = [
+  '4-Ton Truck (Closed / Curtain Side)',
+  '8-Ton Truck',
+  '10-Ton Truck',
+  'Refrigerated Truck (Small–Medium)',
+  'Interlink - Tautliner / Curtain Side',
+  'Interlink - Flatbed',
+  'Interlink - Drop Side',
+  'Superlink',
+  'Tri-Axle Trailer',
+  'Refrigerated Interlink',
+  'Tipper Truck',
+  'Tanker Truck',
+  'Container Truck (20-ft)',
+  'Container Truck (40-ft)',
+  'Other'
+];
+
 export const MOCK_CARRIERS: CarrierProfile[] = [
   {
     id: 'c1',
