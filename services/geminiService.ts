@@ -12,9 +12,19 @@ try {
   console.error("Failed to initialize GoogleGenAI client:", error);
 }
 
-export const getLogisticsAdvice = async (query: string, context: string): Promise<string> => {
+export interface AIResponse {
+  text: string;
+  groundingChunks?: any[];
+}
+
+export interface LocationParams {
+  lat: number;
+  lng: number;
+}
+
+export const getLogisticsAdvice = async (query: string, context: string, location?: LocationParams): Promise<AIResponse> => {
   if (!aiClient) {
-    return "AI Assistant is offline. Please configure the API Key.";
+    return { text: "AI Assistant is offline. Please configure the API Key." };
   }
 
   try {
@@ -22,19 +32,37 @@ export const getLogisticsAdvice = async (query: string, context: string): Promis
     const systemInstruction = `You are an expert logistics assistant for FreightConnect.
     You help shippers and carriers with route optimization, pricing estimates, and document requirements in South Africa.
     Keep answers concise and professional.
+    Use Google Maps to provide accurate location information, distances, and place details when relevant.
     Context: ${context}`;
+
+    const config: any = {
+      systemInstruction: systemInstruction,
+      tools: [{ googleMaps: {} }],
+    };
+
+    if (location) {
+      config.toolConfig = {
+        retrievalConfig: {
+          latLng: {
+            latitude: location.lat,
+            longitude: location.lng
+          }
+        }
+      };
+    }
 
     const response = await aiClient.models.generateContent({
       model: model,
       contents: query,
-      config: {
-        systemInstruction: systemInstruction,
-      }
+      config: config
     });
 
-    return response.text || "I couldn't generate a response at this time.";
+    return {
+      text: response.text || "I couldn't generate a response at this time.",
+      groundingChunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks
+    };
   } catch (error) {
     console.error("Error calling Gemini API:", error);
-    return "Sorry, I encountered an error processing your request.";
+    return { text: "Sorry, I encountered an error processing your request." };
   }
 };

@@ -1,6 +1,5 @@
 
 
-
 import { Booking, BookingStatus, CarrierProfile, Listing, Dispute, QuoteRequest, RiskAlert } from "./types";
 
 export const SA_CITIES = [
@@ -12,6 +11,13 @@ export const SA_CITIES = [
   "Krugersdorp", "Witbank", "Potchefstroom", "Paarl", "Worcester"
 ];
 
+export const SERVICE_CATEGORIES = [
+  "Overnight Road Freight",
+  "Economy Road Freight",
+  "Linehaul / Long-Distance Transport",
+  "Cross-border Road Freight"
+];
+
 export const MOCK_CARRIERS: CarrierProfile[] = [
   {
     id: 'c1',
@@ -19,8 +25,8 @@ export const MOCK_CARRIERS: CarrierProfile[] = [
     verified: true,
     rating: 4.8,
     vehicles: [
-      { id: 'v1', type: 'Refrigerated', regNumber: 'ABC-123', capacityTons: 20, capacityPallets: 24 },
-      { id: 'v2', type: 'Flatbed', regNumber: 'XYZ-789', capacityTons: 30, capacityPallets: 0 }
+      { id: 'v1', type: 'Refrigerated Interlink', regNumber: 'ABC-123', capacityTons: 28, capacityPallets: 24, providesLoadingAssist: false },
+      { id: 'v2', type: 'Interlink - Flatbed', regNumber: 'XYZ-789', capacityTons: 34, capacityPallets: 0, providesLoadingAssist: false }
     ],
     performance: {
       totalJobs: 142,
@@ -36,7 +42,7 @@ export const MOCK_CARRIERS: CarrierProfile[] = [
     verified: false,
     rating: 4.2,
     vehicles: [
-      { id: 'v3', type: 'Box Truck', regNumber: 'HUL-555', capacityTons: 8, capacityPallets: 10 }
+      { id: 'v3', type: '8-Ton Truck', regNumber: 'HUL-555', capacityTons: 8, capacityPallets: 10, providesLoadingAssist: true }
     ],
     performance: {
       totalJobs: 15,
@@ -70,10 +76,16 @@ export const MOCK_LISTINGS: Listing[] = [
     origin: 'Johannesburg',
     destination: 'Cape Town',
     date: '2024-06-15',
-    vehicleType: 'Refrigerated',
+    vehicleType: 'Refrigerated Interlink',
+    serviceCategory: 'Linehaul / Long-Distance Transport',
     serviceType: 'Door-to-Door',
+    transitTime: '2 Days',
     availableTons: 15,
     availablePallets: 20,
+    availableDetails: '15 tons refrigerated space',
+    includesLoadingAssist: false,
+    gitCover: true,
+    gitLimit: 1000000,
     baseRate: 12000,
     price: 13800, // 15% markup
     isBooked: false,
@@ -85,10 +97,15 @@ export const MOCK_LISTINGS: Listing[] = [
     origin: 'Durban',
     destination: 'Pretoria',
     date: '2024-06-18',
-    vehicleType: 'Flatbed',
+    vehicleType: 'Interlink - Flatbed',
+    serviceCategory: 'Economy Road Freight',
     serviceType: 'Depot-to-Depot',
+    transitTime: '3 Days',
     availableTons: 28,
     availablePallets: 0,
+    includesLoadingAssist: false,
+    gitCover: true,
+    gitLimit: 500000,
     baseRate: 8500,
     price: 9775,
     isBooked: false,
@@ -100,10 +117,14 @@ export const MOCK_LISTINGS: Listing[] = [
     origin: 'Port Elizabeth',
     destination: 'Bloemfontein',
     date: '2024-06-20',
-    vehicleType: 'Box Truck',
+    vehicleType: '8-Ton Truck',
+    serviceCategory: 'Overnight Road Freight',
     serviceType: 'Door-to-Door',
+    transitTime: 'Overnight',
     availableTons: 5,
     availablePallets: 6,
+    includesLoadingAssist: true,
+    gitCover: false,
     baseRate: 4000,
     price: 4600,
     isBooked: false,
@@ -199,7 +220,8 @@ export const MOCK_QUOTE_REQUESTS: QuoteRequest[] = [
         shipperName: 'Acme Supplies',
         origin: 'Durban',
         destination: 'Johannesburg',
-        vehicleType: 'Refrigerated',
+        vehicleType: 'Refrigerated Interlink',
+        serviceCategory: 'Linehaul / Long-Distance Transport',
         serviceType: 'Depot-to-Depot',
         cargoType: 'Frozen Fish',
         weight: 12,

@@ -1,9 +1,11 @@
 
+
 import React, { useState } from 'react';
 import { UserRole, Listing, QuoteRequest, QuoteOffer } from '../types';
-import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart } from 'lucide-react';
+import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Pie, Cell } from 'recharts';
 import CitySearchInput from './CitySearchInput';
+import { SERVICE_CATEGORIES } from '../constants';
 
 interface DashboardProps {
   role: UserRole;
@@ -47,14 +49,22 @@ const truckUtilizationData = [
 ];
 
 const VEHICLE_OPTIONS = [
-  'Flatbed', 
-  'Refrigerated', 
-  'Box Truck', 
-  'Tanker', 
-  'Link', 
-  '6m', 
-  '12m', 
-  '8 Ton', 
+  // Medium Vehicles
+  '4-Ton Truck (Closed / Curtain Side)',
+  '8-Ton Truck',
+  '10-Ton Truck',
+  'Refrigerated Truck (Small–Medium)',
+  // Heavy Vehicles
+  'Interlink - Tautliner / Curtain Side',
+  'Interlink - Flatbed',
+  'Interlink - Drop Side',
+  'Superlink',
+  'Tri-Axle Trailer',
+  'Refrigerated Interlink',
+  'Tipper Truck',
+  'Tanker Truck',
+  'Container Truck (20-ft)',
+  'Container Truck (40-ft)',
   'Other'
 ];
 
@@ -100,8 +110,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     date: '',
     cargoType: '',
     weight: '',
-    vehicleType: 'Flatbed',
+    vehicleType: VEHICLE_OPTIONS[0],
     vehicleCustom: '',
+    serviceCategory: SERVICE_CATEGORIES[0],
     serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot'
   });
 
@@ -111,12 +122,17 @@ const Dashboard: React.FC<DashboardProps> = ({
     destination: '',
     date: '',
     collectionWindow: '', 
-    deliveryWindow: '',   
-    vehicleSelect: 'Flatbed',
+    deliveryWindow: '',
+    transitTime: '',   
+    vehicleSelect: VEHICLE_OPTIONS[0],
     vehicleCustom: '',
+    serviceCategory: SERVICE_CATEGORIES[2], // Default to Linehaul
     serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot',
     availabilityType: 'Full' as 'Full' | 'Shared Space',
     spaceDetails: '',
+    includesLoadingAssist: false,
+    gitCover: false,
+    gitLimit: '',
     baseRate: ''
   });
 
@@ -144,9 +160,14 @@ const Dashboard: React.FC<DashboardProps> = ({
           date: postForm.date,
           collectionWindow: postForm.collectionWindow,
           deliveryWindow: postForm.deliveryWindow,
+          transitTime: postForm.transitTime,
           vehicleType: finalVehicleType,
+          serviceCategory: postForm.serviceCategory,
           serviceType: postForm.serviceType,
           availableDetails: postForm.availabilityType === 'Shared Space' ? postForm.spaceDetails : undefined,
+          includesLoadingAssist: postForm.includesLoadingAssist,
+          gitCover: postForm.gitCover,
+          gitLimit: postForm.gitCover ? parseFloat(postForm.gitLimit) : undefined,
           baseRate: carrierRate,
           price: marketPrice
         });
@@ -163,11 +184,16 @@ const Dashboard: React.FC<DashboardProps> = ({
         date: postForm.date,
         collectionWindow: postForm.collectionWindow,
         deliveryWindow: postForm.deliveryWindow,
+        transitTime: postForm.transitTime,
         vehicleType: finalVehicleType,
+        serviceCategory: postForm.serviceCategory,
         serviceType: postForm.serviceType,
         availableTons: 0, // Default
         availablePallets: 0, // Default
         availableDetails: postForm.availabilityType === 'Shared Space' ? postForm.spaceDetails : undefined,
+        includesLoadingAssist: postForm.includesLoadingAssist,
+        gitCover: postForm.gitCover,
+        gitLimit: postForm.gitCover ? parseFloat(postForm.gitLimit) : undefined,
         baseRate: carrierRate,
         price: marketPrice,
         isBooked: false
@@ -182,11 +208,16 @@ const Dashboard: React.FC<DashboardProps> = ({
       date: '',
       collectionWindow: '',
       deliveryWindow: '',
-      vehicleSelect: 'Flatbed',
+      transitTime: '',
+      vehicleSelect: VEHICLE_OPTIONS[0],
       vehicleCustom: '',
+      serviceCategory: SERVICE_CATEGORIES[2],
       serviceType: 'Door-to-Door',
       availabilityType: 'Full',
       spaceDetails: '',
+      includesLoadingAssist: false,
+      gitCover: false,
+      gitLimit: '',
       baseRate: ''
     });
     
@@ -210,8 +241,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           date: '',
           cargoType: '',
           weight: '',
-          vehicleType: 'Flatbed',
+          vehicleType: VEHICLE_OPTIONS[0],
           vehicleCustom: '',
+          serviceCategory: SERVICE_CATEGORIES[0],
           serviceType: 'Door-to-Door'
       });
       setShowSuccess(true);
@@ -227,11 +259,16 @@ const Dashboard: React.FC<DashboardProps> = ({
       date: route.date,
       collectionWindow: route.collectionWindow || '',
       deliveryWindow: route.deliveryWindow || '',
+      transitTime: route.transitTime || '',
       vehicleSelect: isCustom ? 'Other' : route.vehicleType,
       vehicleCustom: isCustom ? route.vehicleType : '',
+      serviceCategory: route.serviceCategory || SERVICE_CATEGORIES[2],
       serviceType: route.serviceType || 'Door-to-Door',
       availabilityType: route.availableDetails ? 'Shared Space' : 'Full',
       spaceDetails: route.availableDetails || '',
+      includesLoadingAssist: route.includesLoadingAssist || false,
+      gitCover: route.gitCover || false,
+      gitLimit: route.gitLimit ? route.gitLimit.toString() : '',
       baseRate: route.baseRate.toString()
     });
     setEditingId(route.id);
@@ -247,6 +284,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (onDeleteListing) onDeleteListing(id);
     }
   };
+
+  // ----------------- ACCESS CONTROL CHECKS -----------------
 
   if (role === 'carrier') {
     if (verificationStatus !== 'verified') {
@@ -339,6 +378,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                  </div>
                </div>
 
+               {/* Transit Time SLA */}
+               <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Transit Time (SLA)</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g., Overnight, 2 Days, Same Day"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={postForm.transitTime}
+                    onChange={(e) => setPostForm({...postForm, transitTime: e.target.value})}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Expected delivery time from collection.</p>
+               </div>
+
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div>
                    <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
@@ -366,9 +418,23 @@ const Dashboard: React.FC<DashboardProps> = ({
                  )}
                </div>
 
+                {/* Service Category Selection */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Service Type</label>
+                    <select 
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={postForm.serviceCategory}
+                        onChange={(e) => setPostForm({...postForm, serviceCategory: e.target.value})}
+                    >
+                        {SERVICE_CATEGORIES.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* Service Type Section */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Collection Method</label>
                     <div className="flex gap-4">
                     <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
                         <input 
@@ -398,6 +464,59 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <span className="block text-xs text-slate-500">Hub-to-Hub Service</span>
                         </div>
                     </label>
+                    </div>
+                </div>
+
+                {/* Additional Services / Insurance */}
+                <div className="space-y-3">
+                    <label className="block text-sm font-medium text-slate-700">Additional Services</label>
+                    
+                    {/* Loading Assistance */}
+                    <label className="flex items-start cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors bg-slate-50">
+                        <input 
+                            type="checkbox" 
+                            className="mt-1 w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                            checked={postForm.includesLoadingAssist}
+                            onChange={(e) => setPostForm({...postForm, includesLoadingAssist: e.target.checked})}
+                        />
+                        <div className="ml-3">
+                            <span className="block text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <Users size={16} /> Driver / Crew Assists with Loading
+                            </span>
+                            <span className="block text-xs text-slate-500">Check this if your price includes manual loading/offloading help.</span>
+                        </div>
+                    </label>
+
+                    {/* GIT Insurance */}
+                    <div className="border border-slate-200 rounded-lg px-4 py-3 bg-slate-50">
+                        <label className="flex items-start cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                className="mt-1 w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                checked={postForm.gitCover}
+                                onChange={(e) => setPostForm({...postForm, gitCover: e.target.checked})}
+                            />
+                            <div className="ml-3">
+                                <span className="block text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <ShieldCheck size={16} /> Goods In Transit (GIT) Cover Included
+                                </span>
+                                <span className="block text-xs text-slate-500">Does your rate include insurance for the goods?</span>
+                            </div>
+                        </label>
+                        
+                        {postForm.gitCover && (
+                            <div className="mt-3 ml-7 animate-in fade-in slide-in-from-top-2">
+                                <label className="block text-xs font-bold text-slate-600 mb-1">Coverage Limit (ZAR)</label>
+                                <input 
+                                    type="number" 
+                                    placeholder="e.g. 500000" 
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={postForm.gitLimit}
+                                    onChange={(e) => setPostForm({...postForm, gitLimit: e.target.value})}
+                                    required={postForm.gitCover}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -486,11 +605,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                         date: '',
                         collectionWindow: '',
                         deliveryWindow: '',
-                        vehicleSelect: 'Flatbed',
+                        transitTime: '',
+                        vehicleSelect: VEHICLE_OPTIONS[0],
                         vehicleCustom: '',
+                        serviceCategory: SERVICE_CATEGORIES[2],
                         serviceType: 'Door-to-Door',
                         availabilityType: 'Full',
                         spaceDetails: '',
+                        includesLoadingAssist: false,
+                        gitCover: false,
+                        gitLimit: '',
                         baseRate: ''
                        });
                      }}
@@ -524,7 +648,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="px-6 py-4 font-semibold text-slate-600">Route</th>
-                        <th className="px-6 py-4 font-semibold text-slate-600">Type</th>
+                        <th className="px-6 py-4 font-semibold text-slate-600">Service & SLA</th>
                         <th className="px-6 py-4 font-semibold text-slate-600">Vehicle</th>
                         <th className="px-6 py-4 font-semibold text-slate-600">Net Earnings</th>
                         <th className="px-6 py-4 font-semibold text-slate-600 text-right">Actions</th>
@@ -545,12 +669,32 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                           </td>
                            <td className="px-6 py-4">
-                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">
-                                {listing.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}
-                            </span>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs font-bold text-slate-700">{listing.serviceCategory}</span>
+                                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 w-fit">
+                                    {listing.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}
+                                </span>
+                                {listing.transitTime && (
+                                    <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1">
+                                        <Clock size={10} /> SLA: {listing.transitTime}
+                                    </span>
+                                )}
+                            </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">{listing.vehicleType}</span>
+                            <div className="flex flex-col gap-1">
+                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full w-fit">{listing.vehicleType}</span>
+                                {listing.includesLoadingAssist && (
+                                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                        <Users size={10} /> Driver Assists
+                                    </span>
+                                )}
+                                {listing.gitCover && (
+                                    <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1">
+                                        <ShieldCheck size={10} /> GIT: R{listing.gitLimit ? (listing.gitLimit/1000).toFixed(0) + 'k' : 'Included'}
+                                    </span>
+                                )}
+                            </div>
                           </td>
                           <td className="px-6 py-4">
                             <span className="font-bold text-emerald-600">R {listing.baseRate.toLocaleString()}</span>
@@ -742,6 +886,16 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   // Shipper Dashboard logic
+  if (role === 'shipper' && verificationStatus !== 'verified') {
+      return (
+        <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+          <AlertTriangle className="mx-auto text-amber-500 mb-4" size={48} />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Customer Verification Required</h2>
+          <p className="text-slate-600">Please complete the customer registration to request quotes and book trucks.</p>
+        </div>
+      );
+  }
+
   return (
     <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -941,8 +1095,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                              </div>
                          )}
 
+                        {/* Service Category */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Service Type</label>
+                            <select 
+                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                value={quoteForm.serviceCategory}
+                                onChange={(e) => setQuoteForm({...quoteForm, serviceCategory: e.target.value})}
+                            >
+                                {SERVICE_CATEGORIES.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Collection Method</label>
                             <div className="flex gap-4">
                                 <label className="flex items-center cursor-pointer border border-slate-200 rounded-lg px-4 py-3 hover:bg-slate-50 transition-colors flex-1">
                                     <input 

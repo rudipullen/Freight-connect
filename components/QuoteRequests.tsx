@@ -1,7 +1,8 @@
 
+
 import React, { useState } from 'react';
 import { QuoteRequest, QuoteOffer, UserRole } from '../types';
-import { DollarSign, Send, X, CheckCircle, Search, Package, ChevronDown, ChevronUp, CreditCard, MapPin, ShieldCheck, FileText, Percent, Radio, Globe } from 'lucide-react';
+import { DollarSign, Send, X, CheckCircle, Search, Package, ChevronDown, ChevronUp, CreditCard, MapPin, ShieldCheck, FileText, Percent, Radio, Globe, Clock } from 'lucide-react';
 
 interface QuoteRequestsProps {
   role?: UserRole;
@@ -30,6 +31,7 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
   // Carrier Offer State
   const [offerAmount, setOfferAmount] = useState('');
   const [offerMessage, setOfferMessage] = useState('');
+  const [offerTransitTime, setOfferTransitTime] = useState('');
   
   // Shipper Payment State
   const [paymentOffer, setPaymentOffer] = useState<QuoteOffer | null>(null);
@@ -64,6 +66,7 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
       carrierId: 'c1', // Mock ID
       carrierName: 'Swift Logistics', // Mock Name
       amount: parseFloat(offerAmount), // This is the carrier's earnings
+      transitTime: offerTransitTime,
       message: offerMessage,
       status: 'Pending',
       createdAt: new Date().toISOString()
@@ -78,6 +81,7 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
     setSelectedRequest(null);
     setOfferAmount('');
     setOfferMessage('');
+    setOfferTransitTime('');
   };
 
   const handlePaymentSubmit = () => {
@@ -166,9 +170,14 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                 <div key={req.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col">
                   <div className="p-5 flex-1">
                     <div className="flex justify-between items-start mb-4">
-                      <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-md">
-                        {req.vehicleType}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-md w-fit">
+                          {req.vehicleType}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">
+                           {req.serviceCategory}
+                        </span>
+                      </div>
                       <span className="text-[10px] text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded border border-slate-100">
                         {new Date(req.createdAt).toLocaleDateString()}
                       </span>
@@ -239,6 +248,7 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                         <p className="text-sm text-slate-500">
                             {req.vehicleType} • {req.weight} Tons • {new Date(req.date).toLocaleDateString()}
                         </p>
+                        <p className="text-xs text-slate-400 mt-0.5">{req.serviceCategory}</p>
                      </div>
                      <div className="text-right hidden md:block">
                         <span className="block font-bold text-slate-700">{requestOffers.length} Offers</span>
@@ -269,6 +279,11 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                                                       {offer.status === 'Declined' && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">DECLINED</span>}
                                                   </div>
                                                   <p className="text-sm text-slate-500">{offer.message || "No message provided"}</p>
+                                                  {offer.transitTime && (
+                                                    <p className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                                                        <Clock size={10} /> SLA: {offer.transitTime}
+                                                    </p>
+                                                  )}
                                                   <div className="flex items-center gap-1 text-[10px] text-emerald-600 mt-1">
                                                       <ShieldCheck size={10} /> Verified Carrier
                                                   </div>
@@ -334,7 +349,11 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                     </div>
                     <div className="flex justify-between">
                         <span className="text-slate-500">Service Type</span>
-                        <span className="font-medium text-slate-800">{selectedRequest.serviceType}</span>
+                        <span className="font-medium text-slate-800">{selectedRequest.serviceCategory}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-slate-500">Collection</span>
+                        <span className="font-medium text-slate-800">{selectedRequest.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}</span>
                     </div>
                 </div>
                 
@@ -353,6 +372,19 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                             />
                         </div>
                         <p className="text-xs text-slate-500 mt-1">Customer will see a marked-up price (approx. R {offerAmount ? (parseFloat(offerAmount) * 1.1).toFixed(0) : '0'})</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Transit Time (SLA)</label>
+                        <input 
+                          type="text"
+                          placeholder="e.g. Overnight, 2-3 Days"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                          value={offerTransitTime}
+                          onChange={(e) => setOfferTransitTime(e.target.value)}
+                          required
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Expected delivery time from pickup.</p>
                     </div>
 
                     <div>
@@ -438,6 +470,12 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                     <span>Carrier</span>
                     <span className="font-bold text-slate-800">{paymentOffer.carrierName}</span>
                  </div>
+                 {paymentOffer.transitTime && (
+                    <div className="flex justify-between">
+                        <span>Transit SLA</span>
+                        <span className="font-bold text-slate-800">{paymentOffer.transitTime}</span>
+                    </div>
+                 )}
                  <div className="flex justify-between">
                     <span>Service Fee</span>
                     <span>Included</span>

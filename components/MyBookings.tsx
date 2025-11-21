@@ -1,7 +1,8 @@
 
+
 import React, { useState, useRef } from 'react';
-import { UserRole, BookingStatus, Dispute, Booking } from '../types';
-import { Upload, FileCheck, MoreHorizontal, AlertTriangle, X, ShieldAlert, Image as ImageIcon, FileText, Plus, Paperclip, Eye, Loader2, CheckCircle, AlertCircle, Box, Truck, Warehouse, CreditCard, Lock, Clock, QrCode, PenTool, Check, Phone, Mail, EyeOff, Map, Shield, Camera, ShieldCheck, KeyRound, MapPin, ExternalLink } from 'lucide-react';
+import { UserRole, BookingStatus, Dispute, Booking, Review } from '../types';
+import { Upload, FileCheck, MoreHorizontal, AlertTriangle, X, ShieldAlert, Image as ImageIcon, FileText, Plus, Paperclip, Eye, Loader2, CheckCircle, AlertCircle, Box, Truck, Warehouse, CreditCard, Lock, Clock, QrCode, PenTool, Check, Phone, Mail, EyeOff, Map, Shield, Camera, ShieldCheck, KeyRound, MapPin, ExternalLink, Star } from 'lucide-react';
 
 interface Props {
   role: UserRole;
@@ -13,15 +14,31 @@ interface Props {
   onUpdateStatus: (bookingId: string, newStatus: BookingStatus) => void;
   onRevealContact: (bookingId: string) => void;
   onConfirmCollection: (bookingId: string, file: File, isSealed: boolean, sealNumber?: string, location?: {lat: number, lng: number}) => void;
+  onRateBooking: (bookingId: string, review: Review) => void;
 }
 
-const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, onCompleteDelivery, onVerifyPOD, onUpdateStatus, onRevealContact, onConfirmCollection }) => {
+const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings, onAddEvidence, onCompleteDelivery, onVerifyPOD, onUpdateStatus, onRevealContact, onConfirmCollection, onRateBooking }) => {
+  // Local state for bookings to handle UI updates for ratings without full app reload/prop drilling for this demo
+  const [localBookings, setLocalBookings] = useState<Booking[]>(initialBookings);
+
+  // Sync local bookings if props change
+  React.useEffect(() => {
+      setLocalBookings(initialBookings);
+  }, [initialBookings]);
+
   const [activeDisputeBooking, setActiveDisputeBooking] = useState<string | null>(null);
   const [activeDeliveryBooking, setActiveDeliveryBooking] = useState<string | null>(null);
   const [activeCollectionBooking, setActiveCollectionBooking] = useState<string | null>(null);
   const [viewWaybillBooking, setViewWaybillBooking] = useState<Booking | null>(null);
   const [viewDetailsBooking, setViewDetailsBooking] = useState<Booking | null>(null);
   
+  // Rating Modal States
+  const [activeRatingBooking, setActiveRatingBooking] = useState<Booking | null>(null);
+  const [ratingScore, setRatingScore] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingCriteria, setRatingCriteria] = useState<{[key: string]: number}>({});
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+
   // Collection Modal States
   const [collectionPhoto, setCollectionPhoto] = useState<File | null>(null);
   const [isTruckSealed, setIsTruckSealed] = useState(false);
@@ -142,7 +159,7 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
   };
 
   const handleVerifyOTP = () => {
-      const booking = bookings.find(b => b.id === activeDeliveryBooking);
+      const booking = localBookings.find(b => b.id === activeDeliveryBooking);
       if (!booking) return;
       
       if (booking.deliveryOtp === otpInput) {
@@ -154,6 +171,35 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
 
   const handleSign = () => {
       setSignatureCaptured(true);
+  };
+
+  // --- Rating Logic ---
+
+  const openRatingModal = (booking: Booking) => {
+      setActiveRatingBooking(booking);
+      setRatingScore(0);
+      setRatingComment('');
+      setRatingCriteria({});
+  };
+
+  const submitRating = async () => {
+      if (!activeRatingBooking) return;
+      setIsSubmittingRating(true);
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const newReview: Review = {
+          rating: ratingScore,
+          comment: ratingComment,
+          createdAt: new Date().toISOString(),
+          criteria: ratingCriteria
+      };
+      
+      onRateBooking(activeRatingBooking.id, newReview);
+
+      setIsSubmittingRating(false);
+      setActiveRatingBooking(null);
   };
 
   const getContactDetails = (booking: Booking) => {
@@ -195,9 +241,11 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {bookings.map((booking) => {
+              {localBookings.map((booking) => {
                 const contact = getContactDetails(booking);
                 const hasCompleteEvidence = booking.loadingPhotoUrl && booking.deliveryPhotoUrl && booking.podUrl;
+                
+                const hasRated = role === 'shipper' ? !!booking.shipperReview : !!booking.carrierReview;
                 
                 return (
                 <tr key={booking.id} className="hover:bg-slate-50 transition-colors">
@@ -326,6 +374,26 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
                   <td className="px-6 py-4 text-right">
                     <div className="flex flex-col gap-2 items-end">
                       <div className="flex flex-wrap justify-end gap-2">
+                         
+                         {/* Rate Button (Only when completed and not rated) */}
+                         {booking.status === BookingStatus.COMPLETED && !hasRated && (
+                             <button 
+                               onClick={() => openRatingModal(booking)}
+                               className="inline-flex items-center px-3 py-1.5 bg-amber-400 text-white rounded-md text-xs font-bold hover:bg-amber-500 transition-colors shadow-sm"
+                             >
+                                 <Star size={14} className="mr-1.5 fill-current" />
+                                 Rate {role === 'carrier' ? 'Shipper' : 'Driver'}
+                             </button>
+                         )}
+
+                         {/* Rated Indicator */}
+                         {hasRated && (
+                             <span className="inline-flex items-center px-3 py-1.5 text-amber-500 bg-amber-50 rounded-md text-xs font-bold border border-amber-200">
+                                 <Star size={14} className="mr-1.5 fill-current" />
+                                 Rated
+                             </span>
+                         )}
+
                          {/* Details Button */}
                          <button 
                            onClick={() => setViewDetailsBooking(booking)}
@@ -426,6 +494,127 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
           </table>
         </div>
       </div>
+
+      {/* Rating Modal */}
+      {activeRatingBooking && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in">
+              <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50">
+                      <h3 className="text-xl font-bold text-slate-800">Rate {role === 'carrier' ? 'Customer' : 'Driver'}</h3>
+                      <p className="text-sm text-slate-500">
+                          {role === 'carrier' ? activeRatingBooking.shipperName : activeRatingBooking.carrierName}
+                      </p>
+                  </div>
+                  <div className="p-6 space-y-6">
+                      
+                      {/* Overall Star Rating */}
+                      <div className="text-center">
+                          <p className="text-sm font-bold text-slate-700 mb-2">Overall Experience</p>
+                          <div className="flex justify-center gap-2">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                      key={star}
+                                      onClick={() => setRatingScore(star)}
+                                      className="focus:outline-none transition-transform hover:scale-110"
+                                  >
+                                      <Star 
+                                          size={32} 
+                                          className={`${star <= ratingScore ? 'text-amber-400 fill-current' : 'text-slate-300'} transition-colors`} 
+                                      />
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+
+                      {/* Specific Criteria based on Role */}
+                      <div className="bg-slate-50 p-4 rounded-xl space-y-4">
+                          {role === 'carrier' ? (
+                              <>
+                                  <div>
+                                      <div className="flex justify-between mb-1">
+                                          <label className="text-xs font-bold text-slate-600">Payment Punctuality (Did they pay on time?)</label>
+                                          <span className="text-xs font-bold text-emerald-600">{ratingCriteria['payment'] || 0}/5</span>
+                                      </div>
+                                      <input 
+                                          type="range" min="1" max="5" step="1"
+                                          value={ratingCriteria['payment'] || 0}
+                                          onChange={(e) => setRatingCriteria({...ratingCriteria, payment: parseInt(e.target.value)})}
+                                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                      />
+                                  </div>
+                                  <div>
+                                      <div className="flex justify-between mb-1">
+                                          <label className="text-xs font-bold text-slate-600">Facility Accessibility (Is dock accessible?)</label>
+                                          <span className="text-xs font-bold text-emerald-600">{ratingCriteria['accessibility'] || 0}/5</span>
+                                      </div>
+                                      <input 
+                                          type="range" min="1" max="5" step="1"
+                                          value={ratingCriteria['accessibility'] || 0}
+                                          onChange={(e) => setRatingCriteria({...ratingCriteria, accessibility: parseInt(e.target.value)})}
+                                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                      />
+                                  </div>
+                              </>
+                          ) : (
+                              <>
+                                  <div>
+                                      <div className="flex justify-between mb-1">
+                                          <label className="text-xs font-bold text-slate-600">Driver Punctuality (On time?)</label>
+                                          <span className="text-xs font-bold text-emerald-600">{ratingCriteria['punctuality'] || 0}/5</span>
+                                      </div>
+                                      <input 
+                                          type="range" min="1" max="5" step="1"
+                                          value={ratingCriteria['punctuality'] || 0}
+                                          onChange={(e) => setRatingCriteria({...ratingCriteria, punctuality: parseInt(e.target.value)})}
+                                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                      />
+                                  </div>
+                                  <div>
+                                      <div className="flex justify-between mb-1">
+                                          <label className="text-xs font-bold text-slate-600">Condition of Goods</label>
+                                          <span className="text-xs font-bold text-emerald-600">{ratingCriteria['condition'] || 0}/5</span>
+                                      </div>
+                                      <input 
+                                          type="range" min="1" max="5" step="1"
+                                          value={ratingCriteria['condition'] || 0}
+                                          onChange={(e) => setRatingCriteria({...ratingCriteria, condition: parseInt(e.target.value)})}
+                                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                      />
+                                  </div>
+                              </>
+                          )}
+                      </div>
+
+                      <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">Comments (Optional)</label>
+                          <textarea 
+                              className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                              rows={3}
+                              placeholder="Share details about your experience..."
+                              value={ratingComment}
+                              onChange={(e) => setRatingComment(e.target.value)}
+                          />
+                      </div>
+
+                      <div className="flex gap-3">
+                          <button 
+                              onClick={() => setActiveRatingBooking(null)}
+                              className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-lg hover:bg-slate-200 transition-colors"
+                          >
+                              Cancel
+                          </button>
+                          <button 
+                              onClick={submitRating}
+                              disabled={ratingScore === 0 || isSubmittingRating}
+                              className={`flex-1 py-3 text-white font-bold rounded-lg flex justify-center items-center gap-2 ${ratingScore === 0 ? 'bg-slate-300 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 shadow-md'}`}
+                          >
+                              {isSubmittingRating ? <Loader2 className="animate-spin" size={18} /> : 'Submit Review'}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* Job Details Modal with Map Preview */}
       {viewDetailsBooking && (
@@ -682,7 +871,7 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in">
               <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 overflow-hidden">
                   {(() => {
-                    const activeBooking = bookings.find(b => b.id === activeDeliveryBooking);
+                    const activeBooking = localBookings.find(b => b.id === activeDeliveryBooking);
                     return (
                       <>
                         <div className="p-6 border-b border-slate-100">

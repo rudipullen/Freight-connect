@@ -13,7 +13,14 @@ export enum BookingStatus {
   DISPUTED = 'Disputed'
 }
 
-export type DocumentType = 'Company Registration' | 'COF' | 'GIT Insurance' | 'Driver PrDP';
+export type DocumentType = 
+  | 'Company Registration' 
+  | 'COF' 
+  | 'GIT Insurance' 
+  | 'Driver PrDP' 
+  | 'ID Document' 
+  | 'VAT Registration' 
+  | 'Payment Rep ID';
 
 export interface CarrierDocument {
   id: string;
@@ -34,6 +41,7 @@ export interface Vehicle {
   capacityTons: number;
   capacityPallets: number;
   photos?: string[];
+  providesLoadingAssist: boolean; // New field for loading/offloading help
 }
 
 export interface CarrierPerformance {
@@ -52,6 +60,15 @@ export interface CarrierProfile {
   documents?: CarrierDocument[];
   performance?: CarrierPerformance;
   riskScore?: 'Low' | 'Medium' | 'High';
+}
+
+export interface ShipperProfile {
+  id: string;
+  entityType: 'Individual' | 'Company';
+  name: string; // Company Name or Individual Name
+  verified: boolean;
+  documents: CarrierDocument[];
+  rating?: number;
 }
 
 export interface RiskAlert {
@@ -74,14 +91,28 @@ export interface Listing {
   date: string; // ISO date string
   collectionWindow?: string; // e.g. "08:00 - 12:00"
   deliveryWindow?: string;   // e.g. "14:00 - 16:00"
+  transitTime?: string; // e.g. "Overnight", "2-3 Days"
   vehicleType: string;
+  serviceCategory: string; // Added service category (Overnight, Economy, etc.)
   serviceType: 'Door-to-Door' | 'Depot-to-Depot';
   availableTons: number;
   availablePallets: number;
   availableDetails?: string; // Free text for space available
+  includesLoadingAssist: boolean; // New field for listing specific assistance
+  gitCover: boolean; // Indicates if GIT insurance is included
+  gitLimit?: number; // The limit of the GIT cover in ZAR
   baseRate: number;
   price: number; // Includes markup
   isBooked: boolean;
+}
+
+export interface Review {
+  rating: number; // 1-5 Stars
+  comment: string;
+  createdAt: string;
+  criteria: {
+    [key: string]: number; // e.g. "Punctuality": 5, "Dock Access": 3
+  };
 }
 
 export interface Booking {
@@ -119,6 +150,10 @@ export interface Booking {
   carrierPhone?: string;
   carrierEmail?: string;
   contactRevealed?: boolean; // To track if contact was shown
+
+  // Two-way Ratings
+  shipperReview?: Review; // The review LEFT BY the Shipper FOR the Carrier
+  carrierReview?: Review; // The review LEFT BY the Carrier FOR the Shipper
 }
 
 export interface DisputeEvidence {
@@ -147,6 +182,7 @@ export interface QuoteRequest {
   origin: string;
   destination: string;
   vehicleType: string;
+  serviceCategory: string; // Added service category
   serviceType: 'Door-to-Door' | 'Depot-to-Depot';
   cargoType: string;
   weight: number;
@@ -161,6 +197,7 @@ export interface QuoteOffer {
   carrierId: string;
   carrierName: string;
   amount: number; // Carrier earning
+  transitTime?: string; // Carrier's promised transit time (SLA)
   message?: string;
   status: 'Pending' | 'Accepted' | 'Declined';
   createdAt: string;

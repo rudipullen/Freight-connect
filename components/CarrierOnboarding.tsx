@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon } from 'lucide-react';
+import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Users } from 'lucide-react';
 import { DocumentType, CarrierDocument, Vehicle } from '../types';
 import CitySearchInput from './CitySearchInput';
 
@@ -35,7 +35,23 @@ const REQUIRED_DOCS: { type: DocumentType; label: string; description: string; r
   },
 ];
 
-const VEHICLE_TYPES = ['Flatbed', 'Refrigerated', 'Box Truck', 'Tanker', 'Other'];
+const VEHICLE_TYPES = [
+  '4-Ton Truck (Closed / Curtain Side)',
+  '8-Ton Truck',
+  '10-Ton Truck',
+  'Refrigerated Truck (Small–Medium)',
+  'Interlink - Tautliner / Curtain Side',
+  'Interlink - Flatbed',
+  'Interlink - Drop Side',
+  'Superlink',
+  'Tri-Axle Trailer',
+  'Refrigerated Interlink',
+  'Tipper Truck',
+  'Tanker Truck',
+  'Container Truck (20-ft)',
+  'Container Truck (40-ft)',
+  'Other'
+];
 
 const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
   const [step, setStep] = useState<1 | 2>(1);
@@ -61,7 +77,8 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
     regNumber: '',
     capacityTons: 0,
     capacityPallets: 0,
-    photos: []
+    photos: [],
+    providesLoadingAssist: false
   });
   const [isCustomType, setIsCustomType] = useState(false);
 
@@ -143,7 +160,8 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
       regNumber: newVehicle.regNumber || 'UNKNOWN',
       capacityTons: Number(newVehicle.capacityTons) || 0,
       capacityPallets: Number(newVehicle.capacityPallets) || 0,
-      photos: photoUrls
+      photos: photoUrls,
+      providesLoadingAssist: newVehicle.providesLoadingAssist || false
     };
 
     setVehicles(prev => [...prev, vehicle]);
@@ -154,7 +172,8 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
       regNumber: '',
       capacityTons: 0,
       capacityPallets: 0,
-      photos: []
+      photos: [],
+      providesLoadingAssist: false
     });
     setIsCustomType(false);
     setVehiclePhotoFiles([]);
@@ -375,7 +394,10 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
                             <div>
                                <h4 className="font-bold text-slate-800">{v.regNumber}</h4>
                                <p className="text-sm text-slate-600">{v.type} • {v.capacityTons} Tons</p>
-                               <p className="text-xs text-slate-400 mt-1">Pallet Capacity: {v.capacityPallets}</p>
+                               <p className="text-xs text-slate-400 mt-1">
+                                   {v.capacityPallets} Pallets 
+                                   {v.providesLoadingAssist && <span className="ml-2 text-emerald-600 font-bold">• Driver Assists</span>}
+                               </p>
                             </div>
                          </div>
                          <button 
@@ -670,6 +692,22 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
                                 onChange={(e) => setNewVehicle({...newVehicle, capacityPallets: Number(e.target.value)})}
                             />
                         </div>
+                    </div>
+
+                    {/* Loading Assistance */}
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <label className="flex items-start cursor-pointer gap-3">
+                            <input 
+                                type="checkbox" 
+                                className="mt-1 w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                checked={newVehicle.providesLoadingAssist}
+                                onChange={(e) => setNewVehicle({...newVehicle, providesLoadingAssist: e.target.checked})}
+                            />
+                            <div>
+                                <span className="block text-sm font-bold text-slate-800">Driver / Crew Assists with Loading</span>
+                                <span className="block text-xs text-slate-500">Check this if you can help load and unload goods.</span>
+                            </div>
+                        </label>
                     </div>
 
                     {/* Vehicle Photo Upload (Multiple) */}

@@ -1,15 +1,18 @@
 
+
 import React, { useState } from 'react';
-import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock } from 'lucide-react';
+import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock, Users, ShieldCheck } from 'lucide-react';
 import { MOCK_LISTINGS } from '../constants';
-import { Listing } from '../types';
+import { Listing, UserRole } from '../types';
 import CitySearchInput from './CitySearchInput';
 
 interface Props {
   listings?: Listing[];
+  role?: UserRole;
+  userEntityId?: string;
 }
 
-const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
+const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEntityId }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [isBooking, setIsBooking] = useState(false);
@@ -18,10 +21,17 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
   // State for address inputs when booking Door-to-Door
   const [addressDetails, setAddressDetails] = useState({ collection: '', delivery: '' });
   
-  const filteredListings = listings.filter(l => 
-    l.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    l.destination.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredListings = listings.filter(l => {
+      const matchesSearch = l.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            l.destination.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Privacy Filter: Carriers can only see their own listings
+      if (role === 'carrier' && userEntityId) {
+          return matchesSearch && l.carrierId === userEntityId;
+      }
+
+      return matchesSearch;
+  });
 
   const handleBook = (listing: Listing) => {
     setSelectedListing(listing);
@@ -70,6 +80,13 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
         </div>
       </div>
 
+      {role === 'carrier' && (
+          <div className="bg-blue-50 text-blue-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 text-sm border border-blue-100">
+              <Info size={16} />
+              <span>You are viewing your posted listings. Competitor listings are hidden for privacy.</span>
+          </div>
+      )}
+
       {/* Listing Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredListings.map(listing => (
@@ -80,9 +97,19 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
                     <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded w-fit">
                     {listing.vehicleType}
                     </span>
-                    <span className="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded w-fit border border-slate-200">
-                    {listing.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}
+                    <span className="text-[10px] font-bold text-slate-500">
+                        {listing.serviceCategory}
                     </span>
+                    {listing.includesLoadingAssist && (
+                        <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-1">
+                            <Users size={12} /> Driver Assists
+                        </span>
+                    )}
+                    {listing.gitCover && (
+                        <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1 mt-0.5">
+                            <ShieldCheck size={12} /> GIT: R{listing.gitLimit ? (listing.gitLimit/1000).toFixed(0) + 'k' : 'Included'}
+                        </span>
+                    )}
                 </div>
                 <div className="text-right">
                   <span className="text-emerald-600 font-bold text-lg block">
@@ -130,12 +157,9 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
                    </p>
                 </div>
                 <div>
-                   <p className="text-slate-500">Capacity</p>
-                   <p className="font-medium truncate">
-                     {listing.availableDetails 
-                        ? listing.availableDetails 
-                        : `${listing.availableTons}t / ${listing.availablePallets} plts`
-                     }
+                   <p className="text-slate-500">Transit Time</p>
+                   <p className="font-medium flex items-center gap-1 text-slate-800">
+                     <Clock size={14} /> {listing.transitTime || 'Standard'}
                    </p>
                 </div>
               </div>
@@ -206,7 +230,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
                             <div className="ml-4">
                               <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Delivery</p>
                               <p className="text-lg font-bold text-slate-800">{selectedListing.destination}</p>
-                              <p className="text-sm text-slate-600">Est. 1-2 days transit</p>
+                              <p className="text-sm text-slate-600">Transit Time: {selectedListing.transitTime || 'Standard'}</p>
                               {selectedListing.deliveryWindow && (
                                   <p className="text-xs font-bold text-emerald-600 mt-1">{selectedListing.deliveryWindow}</p>
                               )}
@@ -227,7 +251,8 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
                            </div>
                            <div>
                               <p className="text-blue-400 text-xs">Service</p>
-                              <p className="text-blue-800 font-medium">
+                              <p className="text-blue-800 font-medium">{selectedListing.serviceCategory}</p>
+                              <p className="text-[10px] text-blue-600">
                                 {selectedListing.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}
                               </p>
                            </div>
@@ -243,6 +268,20 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
                                  {selectedListing.availableDetails || 'Full Truck Load Available'}
                               </p>
                            </div>
+                           {selectedListing.includesLoadingAssist && (
+                               <div className="col-span-2 border-t border-blue-200 pt-2 mt-2">
+                                   <p className="text-emerald-600 font-bold text-sm flex items-center gap-2">
+                                       <Users size={16} /> Driver / Crew Assists with Loading
+                                   </p>
+                               </div>
+                           )}
+                           {selectedListing.gitCover && (
+                               <div className="col-span-2 pt-1">
+                                   <p className="text-blue-600 font-bold text-sm flex items-center gap-2">
+                                       <ShieldCheck size={16} /> GIT Cover: R {selectedListing.gitLimit?.toLocaleString()}
+                                   </p>
+                               </div>
+                           )}
                         </div>
                      </div>
                   </div>
@@ -266,8 +305,10 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
                               <span className="font-medium">Included</span>
                            </div>
                            <div className="flex justify-between">
-                              <span className="text-slate-600">Insurance</span>
-                              <span className="font-medium text-emerald-600">Verified</span>
+                              <span className="text-slate-600">Insurance (GIT)</span>
+                              <span className={`font-medium ${selectedListing.gitCover ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                  {selectedListing.gitCover ? 'Included' : 'Not Included'}
+                              </span>
                            </div>
                         </div>
                      </div>
@@ -317,6 +358,22 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS }) => {
                 <span className="text-slate-500">Carrier</span>
                 <span className="font-medium">{selectedListing.carrierName}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Transit SLA</span>
+                <span className="font-medium text-slate-800">{selectedListing.transitTime || 'Standard'}</span>
+              </div>
+              {selectedListing.includesLoadingAssist && (
+                   <div className="flex justify-between">
+                    <span className="text-slate-500">Loading</span>
+                    <span className="font-bold text-emerald-600 text-xs bg-emerald-50 px-2 py-1 rounded-full">Driver Assists</span>
+                  </div>
+              )}
+              {selectedListing.gitCover && (
+                   <div className="flex justify-between">
+                    <span className="text-slate-500">Insurance</span>
+                    <span className="font-bold text-blue-600 text-xs bg-blue-50 px-2 py-1 rounded-full">GIT Included</span>
+                  </div>
+              )}
 
               {/* Address Inputs for Door-to-Door */}
               {selectedListing.serviceType === 'Door-to-Door' && (

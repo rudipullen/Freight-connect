@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { 
   Truck, 
@@ -14,14 +16,17 @@ import {
   Bot,
   Send,
   MessageSquare,
-  Code
+  Code,
+  MapPin,
+  ExternalLink
 } from 'lucide-react';
-import { UserRole, Listing, Dispute, DisputeEvidence, Booking, BookingStatus, QuoteRequest, QuoteOffer } from './types';
+import { UserRole, Listing, Dispute, DisputeEvidence, Booking, BookingStatus, QuoteRequest, QuoteOffer, Review } from './types';
 import Dashboard from './components/Dashboard';
 import Marketplace from './components/Marketplace';
 import AdminPanel from './components/AdminPanel';
 import MyBookings from './components/MyBookings';
 import CarrierOnboarding from './components/CarrierOnboarding';
+import ShipperOnboarding from './components/ShipperOnboarding';
 import QuoteRequests from './components/QuoteRequests';
 import ApiIntegration from './components/ApiIntegration';
 import { getLogisticsAdvice } from './services/geminiService';
@@ -47,11 +52,13 @@ const App: React.FC = () => {
 
   // Carrier Verification State ('unverified' | 'pending' | 'verified')
   const [carrierStatus, setCarrierStatus] = useState<'unverified' | 'pending' | 'verified'>('unverified');
+  // Shipper Verification State
+  const [shipperStatus, setShipperStatus] = useState<'unverified' | 'pending' | 'verified'>('unverified');
   
   // AI Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([
+  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string, groundingChunks?: any[]}[]>([
     { role: 'model', text: "Hi! I'm the FreightConnect AI. Ask me about route pricing, document requirements, or vehicle types."}
   ]);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -227,6 +234,25 @@ const App: React.FC = () => {
       }, ...prev]);
   };
 
+  const handleRateBooking = (bookingId: string, review: Review) => {
+    setBookings(prev => prev.map(b => {
+      if (b.id === bookingId) {
+        if (role === 'shipper') {
+           return { ...b, shipperReview: review };
+        } else {
+           return { ...b, carrierReview: review };
+        }
+      }
+      return b;
+    }));
+    
+    setNotifications(prev => [{
+      id: Date.now(),
+      text: `Review submitted for Booking #${bookingId.toUpperCase()}.`,
+      time: "Just now"
+    }, ...prev]);
+  };
+
   // --- Quote Handlers ---
 
   const handleRequestQuote = (form: any) => {
@@ -237,6 +263,7 @@ const App: React.FC = () => {
       origin: form.origin,
       destination: form.destination,
       vehicleType: form.vehicleType,
+      serviceCategory: form.serviceCategory,
       serviceType: form.serviceType,
       cargoType: form.cargoType,
       weight: parseFloat(form.weight),
@@ -340,9 +367,24 @@ const App: React.FC = () => {
     List of cities served: ${listings.map(l => l.origin).join(', ')}.
     `;
 
-    const aiResponse = await getLogisticsAdvice(userMsg, context);
+    // Get Location
+    let location = undefined;
+    try {
+       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {timeout: 5000});
+       });
+       location = {
+         lat: pos.coords.latitude,
+         lng: pos.coords.longitude
+       };
+    } catch (e) {
+       // Ignore location error or handle gracefully
+       console.log("Location not available for chat grounding");
+    }
+
+    const response = await getLogisticsAdvice(userMsg, context, location);
     
-    setChatMessages(prev => [...prev, { role: 'model', text: aiResponse }]);
+    setChatMessages(prev => [...prev, { role: 'model', text: response.text, groundingChunks: response.groundingChunks }]);
     setIsAiLoading(false);
   };
 
@@ -351,7 +393,7 @@ const App: React.FC = () => {
       case 'dashboard':
         return <Dashboard 
           role={role} 
-          verificationStatus={carrierStatus}
+          verificationStatus={role === 'carrier' ? carrierStatus : shipperStatus}
           isPosting={false}
           listings={listings}
           notifications={notifications}
@@ -370,7 +412,11 @@ const App: React.FC = () => {
            onDeleteListing={handleDeleteListing}
         />;
       case 'marketplace':
-        return <Marketplace listings={listings} />;
+        return <Marketplace 
+           listings={listings} 
+           role={role}
+           userEntityId={role === 'carrier' ? 'c1' : 's1'}
+        />;
       case 'quotes':
         return <QuoteRequests 
            role={role}
@@ -392,6 +438,7 @@ const App: React.FC = () => {
            onUpdateStatus={handleBookingStatusUpdate}
            onRevealContact={handleRevealContact}
            onConfirmCollection={handleConfirmCollection}
+           onRateBooking={handleRateBooking}
         />;
       case 'admin':
         return <AdminPanel 
@@ -401,7 +448,7 @@ const App: React.FC = () => {
         />;
       case 'api':
         return <ApiIntegration />;
-      case 'onboarding':
+      case 'carrier-onboarding':
         return <CarrierOnboarding onComplete={() => {
            setCarrierStatus('pending');
            setActiveTab('dashboard');
@@ -411,8 +458,18 @@ const App: React.FC = () => {
              time: "Just now"
            }, ...prev]);
         }} />;
+      case 'shipper-onboarding':
+        return <ShipperOnboarding onComplete={() => {
+           setShipperStatus('pending');
+           setActiveTab('dashboard');
+           setNotifications(prev => [{
+             id: Date.now(), 
+             text: "Registration submitted! Verification in progress.", 
+             time: "Just now"
+           }, ...prev]);
+        }} />;
       default:
-        return <Dashboard role={role} />;
+        return <Dashboard role={role} verificationStatus={role === 'carrier' ? carrierStatus : shipperStatus} />;
     }
   };
 
@@ -473,11 +530,11 @@ const App: React.FC = () => {
               </button>
            </div>
 
-           {/* Debug Controls for Testing Verification States */}
+           {/* Debug Controls for Carrier Verification */}
            {role === 'carrier' && (
              <div className="pt-3 border-t border-brand-700">
                 <div className="flex justify-between items-center mb-2">
-                   <span className="text-[10px] text-brand-400 uppercase font-bold">Test Status</span>
+                   <span className="text-[10px] text-brand-400 uppercase font-bold">Carrier Status</span>
                    <span className={`text-[10px] px-1.5 py-0.5 rounded-sm capitalize ${
                      carrierStatus === 'verified' ? 'bg-emerald-500 text-white' : 
                      carrierStatus === 'pending' ? 'bg-blue-500 text-white' : 'bg-amber-500 text-white'
@@ -489,23 +546,43 @@ const App: React.FC = () => {
                    <button 
                      onClick={() => setCarrierStatus('unverified')}
                      className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${carrierStatus === 'unverified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
-                     title="Set status to Unverified"
                    >
-                     Unverified
-                   </button>
-                   <button 
-                     onClick={() => setCarrierStatus('pending')}
-                     className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${carrierStatus === 'pending' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
-                     title="Set status to Pending"
-                   >
-                     Pending
+                     Reset
                    </button>
                    <button 
                      onClick={() => setCarrierStatus('verified')}
                      className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${carrierStatus === 'verified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
-                     title="Set status to Verified"
                    >
-                     Verified
+                     Verify
+                   </button>
+                </div>
+             </div>
+           )}
+
+           {/* Debug Controls for Shipper Verification */}
+           {role === 'shipper' && (
+             <div className="pt-3 border-t border-brand-700">
+                <div className="flex justify-between items-center mb-2">
+                   <span className="text-[10px] text-brand-400 uppercase font-bold">Shipper Status</span>
+                   <span className={`text-[10px] px-1.5 py-0.5 rounded-sm capitalize ${
+                     shipperStatus === 'verified' ? 'bg-emerald-500 text-white' : 
+                     shipperStatus === 'pending' ? 'bg-blue-500 text-white' : 'bg-amber-500 text-white'
+                   }`}>
+                     {shipperStatus}
+                   </span>
+                </div>
+                <div className="flex gap-1">
+                   <button 
+                     onClick={() => setShipperStatus('unverified')}
+                     className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${shipperStatus === 'unverified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
+                   >
+                     Reset
+                   </button>
+                   <button 
+                     onClick={() => setShipperStatus('verified')}
+                     className={`flex-1 text-[10px] px-1 py-1.5 rounded border transition-colors ${shipperStatus === 'verified' ? 'bg-brand-700 border-brand-600 text-white' : 'border-brand-800 text-brand-400 hover:bg-brand-800'}`}
+                   >
+                     Verify
                    </button>
                 </div>
              </div>
@@ -569,13 +646,25 @@ const App: React.FC = () => {
             </button>
           )}
 
+          {/* Carrier Verification Link */}
           {role === 'carrier' && carrierStatus === 'unverified' && (
              <button 
-               onClick={() => { setActiveTab('onboarding'); setIsMobileMenuOpen(false); }}
-               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'onboarding' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800 text-amber-400'}`}
+               onClick={() => { setActiveTab('carrier-onboarding'); setIsMobileMenuOpen(false); }}
+               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'carrier-onboarding' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800 text-amber-400'}`}
              >
                <ShieldCheck size={20} />
                <span className="font-medium">Verify Account</span>
+             </button>
+          )}
+
+          {/* Shipper Verification Link */}
+          {role === 'shipper' && shipperStatus === 'unverified' && (
+             <button 
+               onClick={() => { setActiveTab('shipper-onboarding'); setIsMobileMenuOpen(false); }}
+               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'shipper-onboarding' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'hover:bg-brand-800 text-amber-400'}`}
+             >
+               <ShieldCheck size={20} />
+               <span className="font-medium">Verify Customer</span>
              </button>
           )}
           
@@ -635,7 +724,7 @@ const App: React.FC = () => {
            
            <div className="flex-1 p-4 overflow-y-auto h-80 bg-slate-50 space-y-4">
               {chatMessages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
                      msg.role === 'user' 
                        ? 'bg-brand-600 text-white rounded-tr-none' 
@@ -643,6 +732,29 @@ const App: React.FC = () => {
                    }`}>
                       {msg.text}
                    </div>
+                   {msg.groundingChunks && msg.groundingChunks.length > 0 && (
+                      <div className={`flex flex-wrap gap-2 mt-2 max-w-[85%] ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          {msg.groundingChunks.map((chunk, i) => {
+                              if (chunk.web?.uri) {
+                                  return (
+                                    <a key={i} href={chunk.web.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full hover:bg-slate-200 transition-colors border border-slate-200">
+                                        <ExternalLink size={10} />
+                                        <span className="truncate max-w-[150px]">{chunk.web.title || 'Source'}</span>
+                                    </a>
+                                  );
+                              }
+                              if (chunk.maps?.uri) {
+                                  return (
+                                    <a key={i} href={chunk.maps.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full hover:bg-emerald-100 transition-colors border border-emerald-200">
+                                        <MapPin size={10} />
+                                        <span className="truncate max-w-[150px]">{chunk.maps.title || 'Google Maps'}</span>
+                                    </a>
+                                  );
+                              }
+                              return null;
+                          })}
+                      </div>
+                   )}
                 </div>
               ))}
               {isAiLoading && (
