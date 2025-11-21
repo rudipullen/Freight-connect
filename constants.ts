@@ -1,5 +1,3 @@
-
-
 import { Booking, BookingStatus, CarrierProfile, Listing, Dispute, QuoteRequest, RiskAlert } from "./types";
 
 export const SA_CITIES = [

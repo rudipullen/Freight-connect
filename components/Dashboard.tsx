@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { UserRole, Listing, QuoteRequest, QuoteOffer } from '../types';
 import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck } from 'lucide-react';

@@ -1,8 +1,7 @@
 
-
 import React, { useState } from 'react';
 import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock, Users, ShieldCheck } from 'lucide-react';
-import { MOCK_LISTINGS, VEHICLE_OPTIONS } from '../constants';
+import { MOCK_LISTINGS, VEHICLE_OPTIONS, MOCK_CARRIERS } from '../constants';
 import { Listing, UserRole } from '../types';
 import CitySearchInput from './CitySearchInput';
 
@@ -78,6 +77,10 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
     alert(`Booking confirmed! Funds held in escrow for Listing #${selectedListing?.id}`);
     setIsBooking(false);
     setSelectedListing(null);
+  };
+  
+  const getCarrierDetails = (carrierId: string) => {
+      return MOCK_CARRIERS.find(c => c.id === carrierId);
   };
 
   return (
@@ -214,7 +217,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
                     <span className="text-emerald-600 font-bold text-lg block">
                       R {listing.price.toLocaleString()}
                     </span>
-                    <span className="text-[10px] text-slate-400 uppercase">Inc. VAT</span>
+                    <span className="text-xs text-slate-400 uppercase">Inc. VAT</span>
                   </div>
                 </div>
                 
@@ -305,139 +308,202 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
                </button>
             </div>
             
-            <div className="p-6 overflow-y-auto">
-               <div className="flex flex-col md:flex-row gap-8">
-                  {/* Route Visual */}
-                  <div className="flex-1">
-                     <div className="bg-slate-100 rounded-xl p-6 mb-6 border border-slate-200">
-                        <div className="space-y-8 relative">
-                          <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-300 border-l border-dashed border-slate-400"></div>
-                          
-                          <div className="flex items-start relative z-10">
-                            <div className="w-6 h-6 rounded-full bg-blue-500 border-4 border-white shadow-sm flex-shrink-0"></div>
-                            <div className="ml-4">
-                              <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Pickup</p>
-                              <p className="text-lg font-bold text-slate-800">{selectedListing.origin}</p>
-                              <p className="text-sm text-slate-600">{selectedListing.date}</p>
-                              {selectedListing.collectionWindow && (
-                                  <p className="text-xs font-bold text-blue-600 mt-1">{selectedListing.collectionWindow}</p>
-                              )}
+            <div className="overflow-y-auto flex-1">
+                {/* Map Preview */}
+                <div className="w-full h-64 bg-slate-100 relative">
+                    <iframe 
+                        title="Route Map"
+                        width="100%" 
+                        height="100%" 
+                        frameBorder="0" 
+                        scrolling="no" 
+                        src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedListing.origin)},+South+Africa+to+${encodeURIComponent(selectedListing.destination)},+South+Africa&t=&z=7&ie=UTF8&iwloc=&output=embed`}
+                        className="opacity-90 hover:opacity-100 transition-opacity"
+                    ></iframe>
+                    <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-bold text-slate-700 pointer-events-none flex items-center gap-2">
+                        <MapPin size={12} /> Route Preview
+                    </div>
+                </div>
+
+                <div className="p-6">
+                <div className="flex flex-col md:flex-row gap-8">
+                    {/* Route Visual */}
+                    <div className="flex-1">
+                        <div className="bg-slate-100 rounded-xl p-6 mb-6 border border-slate-200">
+                            <div className="space-y-8 relative">
+                            <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-300 border-l border-dashed border-slate-400"></div>
+                            
+                            <div className="flex items-start relative z-10">
+                                <div className="w-6 h-6 rounded-full bg-blue-500 border-4 border-white shadow-sm flex-shrink-0"></div>
+                                <div className="ml-4">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Pickup</p>
+                                <p className="text-lg font-bold text-slate-800">{selectedListing.origin}</p>
+                                <p className="text-sm text-slate-600">{selectedListing.date}</p>
+                                {selectedListing.collectionWindow && (
+                                    <p className="text-xs font-bold text-blue-600 mt-1">{selectedListing.collectionWindow}</p>
+                                )}
+                                </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-start relative z-10">
-                            <div className="w-6 h-6 rounded-full bg-emerald-500 border-4 border-white shadow-sm flex-shrink-0"></div>
-                            <div className="ml-4">
-                              <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Delivery</p>
-                              <p className="text-lg font-bold text-slate-800">{selectedListing.destination}</p>
-                              <p className="text-sm text-slate-600">Transit Time: {selectedListing.transitTime || 'Standard'}</p>
-                              {selectedListing.deliveryWindow && (
-                                  <p className="text-xs font-bold text-emerald-600 mt-1">{selectedListing.deliveryWindow}</p>
-                              )}
+                            <div className="flex items-start relative z-10">
+                                <div className="w-6 h-6 rounded-full bg-emerald-500 border-4 border-white shadow-sm flex-shrink-0"></div>
+                                <div className="ml-4">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Delivery</p>
+                                <p className="text-lg font-bold text-slate-800">{selectedListing.destination}</p>
+                                <p className="text-sm text-slate-600">Transit Time: {selectedListing.transitTime || 'Standard'}</p>
+                                {selectedListing.deliveryWindow && (
+                                    <p className="text-xs font-bold text-emerald-600 mt-1">{selectedListing.deliveryWindow}</p>
+                                )}
+                                </div>
                             </div>
-                          </div>
+                            </div>
                         </div>
-                     </div>
 
-                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                        <div className="flex items-center gap-3 mb-2">
-                           <Truck className="text-blue-600" size={20} />
-                           <h4 className="font-bold text-blue-900">Vehicle Specifications</h4>
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                            <div className="flex items-center gap-3 mb-2">
+                            <Truck className="text-blue-600" size={20} />
+                            <h4 className="font-bold text-blue-900">Vehicle Specifications</h4>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p className="text-blue-400 text-xs">Type</p>
+                                <p className="text-blue-800 font-medium">{selectedListing.vehicleType}</p>
+                            </div>
+                            <div>
+                                <p className="text-blue-400 text-xs">Service</p>
+                                <p className="text-blue-800 font-medium">{selectedListing.serviceCategory}</p>
+                                <p className="text-[10px] text-blue-600">
+                                    {selectedListing.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-blue-400 text-xs">Capacity</p>
+                                <p className="text-blue-800 font-medium">
+                                    {selectedListing.availableTons} Tons / {selectedListing.availablePallets} Pallets
+                                </p>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-blue-400 text-xs">Space Available</p>
+                                <p className="text-blue-800 font-medium">
+                                    {selectedListing.availableDetails || 'Full Truck Load Available'}
+                                </p>
+                            </div>
+                            {selectedListing.includesLoadingAssist && (
+                                <div className="col-span-2 border-t border-blue-200 pt-2 mt-2">
+                                    <p className="text-emerald-600 font-bold text-sm flex items-center gap-2">
+                                        <Users size={16} /> Driver / Crew Assists with Loading
+                                    </p>
+                                </div>
+                            )}
+                            {selectedListing.gitCover && (
+                                <div className="col-span-2 pt-1">
+                                    <p className="text-blue-600 font-bold text-sm flex items-center gap-2">
+                                        <ShieldCheck size={16} /> GIT Cover: R {selectedListing.gitLimit?.toLocaleString()}
+                                    </p>
+                                </div>
+                            )}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                           <div>
-                              <p className="text-blue-400 text-xs">Type</p>
-                              <p className="text-blue-800 font-medium">{selectedListing.vehicleType}</p>
-                           </div>
-                           <div>
-                              <p className="text-blue-400 text-xs">Service</p>
-                              <p className="text-blue-800 font-medium">{selectedListing.serviceCategory}</p>
-                              <p className="text-[10px] text-blue-600">
-                                {selectedListing.serviceType === 'Door-to-Door' ? 'Collect & Deliver' : 'Depot-to-Depot'}
-                              </p>
-                           </div>
-                           <div>
-                              <p className="text-blue-400 text-xs">Capacity</p>
-                              <p className="text-blue-800 font-medium">
-                                 {selectedListing.availableTons} Tons / {selectedListing.availablePallets} Pallets
-                              </p>
-                           </div>
-                           <div className="col-span-2">
-                              <p className="text-blue-400 text-xs">Space Available</p>
-                              <p className="text-blue-800 font-medium">
-                                 {selectedListing.availableDetails || 'Full Truck Load Available'}
-                              </p>
-                           </div>
-                           {selectedListing.includesLoadingAssist && (
-                               <div className="col-span-2 border-t border-blue-200 pt-2 mt-2">
-                                   <p className="text-emerald-600 font-bold text-sm flex items-center gap-2">
-                                       <Users size={16} /> Driver / Crew Assists with Loading
-                                   </p>
-                               </div>
-                           )}
-                           {selectedListing.gitCover && (
-                               <div className="col-span-2 pt-1">
-                                   <p className="text-blue-600 font-bold text-sm flex items-center gap-2">
-                                       <ShieldCheck size={16} /> GIT Cover: R {selectedListing.gitLimit?.toLocaleString()}
-                                   </p>
-                               </div>
-                           )}
-                        </div>
-                     </div>
-                  </div>
+                    </div>
 
-                  {/* Pricing & Action */}
-                  <div className="md:w-72 flex flex-col">
-                     <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
-                        <p className="text-sm text-slate-500 mb-1">Total Rate</p>
-                        <div className="flex items-baseline gap-1">
-                          <h3 className="text-3xl font-bold text-emerald-600 mb-1">R {selectedListing.price.toLocaleString()}</h3>
+                    {/* Pricing & Action */}
+                    <div className="md:w-72 flex flex-col">
+                        <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
+                            <p className="text-sm text-slate-500 mb-1">Total Rate</p>
+                            <div className="flex items-baseline gap-1">
+                            <h3 className="text-3xl font-bold text-emerald-600 mb-1">R {selectedListing.price.toLocaleString()}</h3>
+                            </div>
+                            <p className="text-xs text-slate-400 mb-4">Includes VAT</p>
+                            
+                            <div className="space-y-3 text-sm border-t border-slate-100 pt-3">
+                            <div className="flex justify-between">
+                                <span className="text-slate-600">Base Rate</span>
+                                <span className="font-medium">Included</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-600">Platform Fee</span>
+                                <span className="font-medium">Included</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-600">Insurance (GIT)</span>
+                                <span className={`font-medium ${selectedListing.gitCover ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                    {selectedListing.gitCover ? 'Included' : 'Not Included'}
+                                </span>
+                            </div>
+                            </div>
                         </div>
-                        <p className="text-xs text-slate-400 mb-4">Includes VAT</p>
-                        
-                        <div className="space-y-3 text-sm border-t border-slate-100 pt-3">
-                           <div className="flex justify-between">
-                              <span className="text-slate-600">Base Rate</span>
-                              <span className="font-medium">Included</span>
-                           </div>
-                           <div className="flex justify-between">
-                              <span className="text-slate-600">Platform Fee</span>
-                              <span className="font-medium">Included</span>
-                           </div>
-                           <div className="flex justify-between">
-                              <span className="text-slate-600">Insurance (GIT)</span>
-                              <span className={`font-medium ${selectedListing.gitCover ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                  {selectedListing.gitCover ? 'Included' : 'Not Included'}
-                              </span>
-                           </div>
-                        </div>
-                     </div>
 
-                     <div className="bg-slate-50 rounded-xl p-4 mb-6">
-                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">Carrier Info</p>
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center font-bold text-slate-600">
-                             {selectedListing.carrierName.substring(0,2)}
-                           </div>
-                           <div>
-                              <p className="font-bold text-slate-800">{selectedListing.carrierName}</p>
-                              <p className="text-xs text-emerald-600 flex items-center gap-1">
-                                 <CheckCircle size={10} /> Verified Carrier
-                              </p>
-                           </div>
-                        </div>
-                     </div>
+                        {(() => {
+                           const carrier = getCarrierDetails(selectedListing.carrierId);
+                           return (
+                            <div className="bg-slate-50 rounded-xl p-4 mb-6">
+                                <div className="flex justify-between items-center mb-2">
+                                    <p className="text-xs font-bold text-slate-500 uppercase">Carrier Info</p>
+                                    {carrier?.riskScore && (
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${
+                                            carrier.riskScore === 'Low' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                            carrier.riskScore === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                            'bg-red-50 text-red-700 border-red-200'
+                                        }`}>
+                                            <ShieldCheck size={10} /> Risk: {carrier.riskScore}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center font-bold text-slate-600">
+                                        {selectedListing.carrierName.substring(0,2)}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-800">{selectedListing.carrierName}</p>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            {carrier?.verified && (
+                                                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                                                    <CheckCircle size={10} /> Verified
+                                                </p>
+                                            )}
+                                            {carrier?.rating && (
+                                                <p className="text-xs text-amber-500 flex items-center gap-1">
+                                                    ★ {carrier.rating}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                {carrier?.performance && (
+                                    <div className="mt-3 pt-3 border-t border-slate-200 grid grid-cols-3 gap-1 text-center">
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 uppercase">Jobs</p>
+                                            <p className="text-xs font-bold text-slate-700">{carrier.performance.totalJobs}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 uppercase">On-Time</p>
+                                            <p className={`text-xs font-bold ${carrier.performance.onTimeRate >= 90 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                {carrier.performance.onTimeRate}%
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 uppercase">Cancel</p>
+                                            <p className={`text-xs font-bold ${carrier.performance.cancellationRate <= 2 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {carrier.performance.cancellationRate}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                           );
+                        })()}
 
-                     <div className="mt-auto">
-                        <button 
-                          onClick={() => handleBook(selectedListing)}
-                          className="w-full bg-brand-900 text-white py-3 rounded-xl font-bold hover:bg-brand-800 transition-colors shadow-lg shadow-brand-900/20"
-                        >
-                          Book Now
-                        </button>
-                     </div>
-                  </div>
-               </div>
+                        <div className="mt-auto">
+                            <button 
+                            onClick={() => handleBook(selectedListing)}
+                            className="w-full bg-brand-900 text-white py-3 rounded-xl font-bold hover:bg-brand-800 transition-colors shadow-lg shadow-brand-900/20"
+                            >
+                            Book Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                </div>
             </div>
           </div>
         </div>
@@ -516,7 +582,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
                 <span className="text-slate-800 font-bold">Total Escrow Amount</span>
                 <div className="text-right">
                    <span className="text-emerald-600 font-bold block">R {selectedListing.price.toLocaleString()}</span>
-                   <span className="text-[10px] text-slate-400">Inc. VAT</span>
+                   <span className="text-xs text-slate-400">Inc. VAT</span>
                 </div>
               </div>
             </div>
