@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { UserRole, Listing, QuoteRequest, QuoteOffer } from '../types';
 import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart } from 'lucide-react';
@@ -58,7 +59,6 @@ const VEHICLE_OPTIONS = [
 ];
 
 const STANDARD_MARKUP = 0.10; // 10%
-const PROMO_MARKUP = 0.05;    // 5%
 
 const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string, icon: any, color: string, subtext?: string }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center">
@@ -117,8 +117,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot',
     availabilityType: 'Full' as 'Full' | 'Shared Space',
     spaceDetails: '',
-    baseRate: '',
-    isPromotion: false
+    baseRate: ''
   });
 
   const handlePostSubmit = (e: React.FormEvent) => {
@@ -129,9 +128,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       ? postForm.vehicleCustom 
       : postForm.vehicleSelect;
 
-    // Markup Logic: Add 10% (or 5% if promo) to the carrier's base rate
+    // Markup Logic: Add 10% to the carrier's base rate
     const carrierRate = parseFloat(postForm.baseRate);
-    const markup = postForm.isPromotion ? PROMO_MARKUP : STANDARD_MARKUP;
+    const markup = STANDARD_MARKUP;
     const marketPrice = carrierRate * (1 + markup);
 
     if (editingId && onUpdateListing) {
@@ -188,8 +187,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       serviceType: 'Door-to-Door',
       availabilityType: 'Full',
       spaceDetails: '',
-      baseRate: '',
-      isPromotion: false
+      baseRate: ''
     });
     
     setShowSuccess(true);
@@ -222,7 +220,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const handleEdit = (route: Listing) => {
     const isCustom = !VEHICLE_OPTIONS.includes(route.vehicleType) && route.vehicleType !== 'Other';
-    const impliedMarkup = (route.price / route.baseRate) - 1;
     
     setPostForm({
       origin: route.origin,
@@ -235,8 +232,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       serviceType: route.serviceType || 'Door-to-Door',
       availabilityType: route.availableDetails ? 'Shared Space' : 'Full',
       spaceDetails: route.availableDetails || '',
-      baseRate: route.baseRate.toString(),
-      isPromotion: impliedMarkup < 0.08 // Approximation for edit state reconstruction
+      baseRate: route.baseRate.toString()
     });
     setEditingId(route.id);
     setShowSuccess(false);
@@ -266,7 +262,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (isPosting) {
       // Calculate preview for carrier
       const previewBase = parseFloat(postForm.baseRate) || 0;
-      const previewMarkup = postForm.isPromotion ? PROMO_MARKUP : STANDARD_MARKUP;
+      const previewMarkup = STANDARD_MARKUP;
       const previewPrice = previewBase * (1 + previewMarkup);
 
       return (
@@ -466,25 +462,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <p className="text-xs text-slate-500 mt-1 font-medium">This is the amount you will be paid.</p>
                  </div>
 
-                 <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <div className="flex items-center gap-2">
-                        <Percent size={18} className="text-emerald-600" />
-                        <div>
-                            <span className="text-sm font-bold text-slate-700 block">Run Promotion?</span>
-                            <span className="text-xs text-slate-500">Reduce markup to 5% to attract more customers</span>
-                        </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
-                          checked={postForm.isPromotion}
-                          onChange={(e) => setPostForm({...postForm, isPromotion: e.target.checked})}
-                        />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
-                 </div>
-
                  {/* Preview Calculation */}
                  {previewBase > 0 && (
                      <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-200">
@@ -514,8 +491,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         serviceType: 'Door-to-Door',
                         availabilityType: 'Full',
                         spaceDetails: '',
-                        baseRate: '',
-                        isPromotion: false
+                        baseRate: ''
                        });
                      }}
                      className="px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-lg hover:bg-slate-200"

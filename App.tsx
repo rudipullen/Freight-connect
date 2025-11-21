@@ -29,7 +29,7 @@ import { MOCK_LISTINGS, MOCK_DISPUTES, MOCK_BOOKINGS, MOCK_QUOTE_REQUESTS } from
 
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>('carrier');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('marketplace');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Centralized Data State

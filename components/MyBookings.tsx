@@ -20,6 +20,7 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
   const [activeDeliveryBooking, setActiveDeliveryBooking] = useState<string | null>(null);
   const [activeCollectionBooking, setActiveCollectionBooking] = useState<string | null>(null);
   const [viewWaybillBooking, setViewWaybillBooking] = useState<Booking | null>(null);
+  const [viewDetailsBooking, setViewDetailsBooking] = useState<Booking | null>(null);
   
   // Collection Modal States
   const [collectionPhoto, setCollectionPhoto] = useState<File | null>(null);
@@ -325,6 +326,15 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
                   <td className="px-6 py-4 text-right">
                     <div className="flex flex-col gap-2 items-end">
                       <div className="flex flex-wrap justify-end gap-2">
+                         {/* Details Button */}
+                         <button 
+                           onClick={() => setViewDetailsBooking(booking)}
+                           className="inline-flex items-center px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-md text-xs font-medium hover:bg-slate-50 transition-colors"
+                         >
+                             <Eye size={14} className="mr-1.5" />
+                             Details
+                         </button>
+
                          {/* Waybill Button */}
                          <button 
                            onClick={() => setViewWaybillBooking(booking)}
@@ -417,7 +427,112 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings, onAddEvidence, 
         </div>
       </div>
 
-      {/* Waybill Modal (Unchanged) */}
+      {/* Job Details Modal with Map Preview */}
+      {viewDetailsBooking && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl animate-in zoom-in-95 overflow-hidden max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800">Job Details</h3>
+                        <p className="text-sm text-slate-500">Booking #{viewDetailsBooking.id.toUpperCase()}</p>
+                    </div>
+                    <button onClick={() => setViewDetailsBooking(null)} className="p-2 hover:bg-slate-100 rounded-full">
+                        <X size={24} className="text-slate-400" />
+                    </button>
+                </div>
+                
+                <div className="p-0">
+                    {/* Map Preview */}
+                    <div className="w-full h-64 bg-slate-100 relative">
+                        <iframe 
+                            title="Route Map"
+                            width="100%" 
+                            height="100%" 
+                            frameBorder="0" 
+                            scrolling="no" 
+                            src={`https://maps.google.com/maps?q=${encodeURIComponent(viewDetailsBooking.origin)},+South+Africa+to+${encodeURIComponent(viewDetailsBooking.destination)},+South+Africa&t=&z=7&ie=UTF8&iwloc=&output=embed`}
+                            className="opacity-90 hover:opacity-100 transition-opacity"
+                        ></iframe>
+                        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-bold text-slate-700 pointer-events-none flex items-center gap-2">
+                            <Map size={12} /> Route Preview
+                        </div>
+                    </div>
+
+                    <div className="p-6 space-y-6">
+                        {/* Route Info */}
+                        <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                                <p className="text-xs text-slate-500 uppercase font-bold">Origin</p>
+                                <p className="font-bold text-slate-800 text-lg flex items-center gap-1">
+                                    <MapPin size={16} className="text-blue-500" /> {viewDetailsBooking.origin}
+                                </p>
+                                <p className="text-sm text-slate-500">{new Date(viewDetailsBooking.pickupDate).toLocaleDateString()}</p>
+                            </div>
+                            <div className="mt-2 px-4 flex-1 hidden sm:block">
+                                <div className="flex gap-1 justify-center">
+                                    <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                    <div className="w-2 h-2 rounded-full bg-blue-300"></div>
+                                    <div className="w-2 h-2 rounded-full bg-blue-200"></div>
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                </div>
+                            </div>
+                            <div className="space-y-1 text-right">
+                                <p className="text-xs text-slate-500 uppercase font-bold">Destination</p>
+                                <p className="font-bold text-slate-800 text-lg flex items-center gap-1 justify-end">
+                                    {viewDetailsBooking.destination} <MapPin size={16} className="text-emerald-500" />
+                                </p>
+                                <p className="text-sm text-slate-500">Est. Delivery: 1-2 Days</p>
+                            </div>
+                        </div>
+
+                        {/* Job Stats */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Financials</p>
+                                <p className="text-lg font-bold text-emerald-600">R {viewDetailsBooking.baseRate?.toLocaleString() ?? '0.00'}</p>
+                                <p className="text-xs text-slate-400">Your Net Earnings</p>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Current Status</p>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(viewDetailsBooking.status)}`}>
+                                    {viewDetailsBooking.status}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Contact Info */}
+                        <div className="p-4 border border-slate-200 rounded-xl">
+                            <h4 className="font-bold text-slate-800 mb-3">Client Details</h4>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="text-slate-500">Company</p>
+                                    <p className="font-medium">{viewDetailsBooking.shipperName}</p>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500">Contact</p>
+                                    <p className="font-medium flex items-center gap-2">
+                                        {viewDetailsBooking.contactRevealed ? viewDetailsBooking.shipperPhone : '• • • • • •'}
+                                        {!viewDetailsBooking.contactRevealed && <span className="text-[10px] text-slate-400">(Hidden)</span>}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                    <button 
+                    onClick={() => setViewDetailsBooking(null)}
+                    className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors"
+                    >
+                        Close Details
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Waybill Modal */}
       {viewWaybillBooking && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in">
               <div className="bg-white rounded-lg w-full max-w-sm shadow-2xl animate-in zoom-in-95">
