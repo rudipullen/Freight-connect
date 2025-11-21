@@ -5,6 +5,7 @@ export type UserRole = 'shipper' | 'carrier' | 'admin';
 export enum BookingStatus {
   PENDING = 'Pending',
   ACCEPTED = 'Accepted',
+  BOOKED = 'Booked',
   COLLECTED = 'Collected', // Represents "Loaded"
   IN_TRANSIT = 'In Transit',
   AT_HUB = 'At Hub',
@@ -175,6 +176,14 @@ export interface Dispute {
   evidence: DisputeEvidence[];
 }
 
+export interface Parcel {
+  length: number;
+  width: number;
+  height: number;
+  weight: number;
+  quantity: number;
+}
+
 export interface QuoteRequest {
   id: string;
   shipperId: string;
@@ -185,7 +194,7 @@ export interface QuoteRequest {
   serviceCategory: string; // Added service category
   serviceType: 'Door-to-Door' | 'Depot-to-Depot';
   cargoType: string;
-  weight: number;
+  weight: number; // Total weight
   date: string;
   status: 'Open' | 'Booked' | 'Closed';
   createdAt: string;
@@ -194,6 +203,7 @@ export interface QuoteRequest {
       width: number;
       height: number;
   };
+  parcels?: Parcel[]; // Multiple parcels support
 }
 
 export interface QuoteOffer {

@@ -1,7 +1,8 @@
 
+
 import React, { useState } from 'react';
 import { QuoteRequest, QuoteOffer, UserRole } from '../types';
-import { DollarSign, Send, X, CheckCircle, Search, Package, ChevronDown, ChevronUp, CreditCard, MapPin, ShieldCheck, FileText, Percent, Radio, Globe, Clock } from 'lucide-react';
+import { DollarSign, Send, X, CheckCircle, Search, Package, ChevronDown, ChevronUp, CreditCard, MapPin, ShieldCheck, FileText, Percent, Radio, Globe, Clock, Box } from 'lucide-react';
 
 interface QuoteRequestsProps {
   role?: UserRole;
@@ -210,10 +211,21 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                           <span className="font-medium text-slate-700">{req.cargoType}</span>
                        </div>
                        <div className="flex justify-between">
-                          <span className="text-slate-500">Weight</span>
+                          <span className="text-slate-500">Total Weight</span>
                           <span className="font-medium text-slate-700">{req.weight.toLocaleString()} Kgs</span>
                        </div>
-                       {req.dimensions && (
+                       {req.parcels && req.parcels.length > 0 ? (
+                          <div className="pt-1 mt-1 border-t border-slate-200">
+                              <span className="text-xs font-bold text-slate-500 block mb-1">{req.parcels.length} Item(s)</span>
+                              {req.parcels.slice(0, 2).map((p, idx) => (
+                                  <div key={idx} className="text-xs text-slate-600 flex justify-between">
+                                      <span>{p.quantity}x ({p.length}x{p.width}x{p.height}cm)</span>
+                                      <span>{p.weight}kg</span>
+                                  </div>
+                              ))}
+                              {req.parcels.length > 2 && <span className="text-[10px] text-slate-400">+{req.parcels.length - 2} more...</span>}
+                          </div>
+                       ) : req.dimensions && (
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Dimensions</span>
                                 <span className="font-medium text-slate-700 text-xs">{req.dimensions.length}x{req.dimensions.width}x{req.dimensions.height} cm</span>
@@ -252,13 +264,11 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                         </div>
                         <p className="text-sm text-slate-500">
                             {req.vehicleType} • {req.weight.toLocaleString()} Kgs • {new Date(req.date).toLocaleDateString()}
-                            {req.dimensions && (
-                                <span className="ml-2 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                    {req.dimensions.length}x{req.dimensions.width}x{req.dimensions.height} cm
-                                </span>
-                            )}
                         </p>
-                        <p className="text-xs text-slate-400 mt-0.5">{req.serviceCategory}</p>
+                        <div className="flex gap-2 text-xs mt-1 text-slate-400">
+                             <span>{req.serviceCategory}</span>
+                             {req.parcels && <span>• {req.parcels.length} Items</span>}
+                        </div>
                      </div>
                      <div className="text-right hidden md:block">
                         <span className="block font-bold text-slate-700">{requestOffers.length} Offers</span>
@@ -271,6 +281,21 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                   
                   {isExpanded && (
                       <div className="bg-slate-50 border-t border-slate-200 p-5 animate-in fade-in slide-in-from-top-2">
+                          {/* Parcel Details Expansion */}
+                          {req.parcels && (
+                              <div className="mb-4 p-3 bg-white rounded border border-slate-200">
+                                  <h5 className="text-xs font-bold text-slate-500 uppercase mb-2">Cargo Manifest</h5>
+                                  <div className="space-y-1">
+                                      {req.parcels.map((p, idx) => (
+                                          <div key={idx} className="text-xs flex justify-between text-slate-700">
+                                              <span>{p.quantity}x Item ({p.length}x{p.width}x{p.height}cm)</span>
+                                              <span>{p.weight}kg each</span>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
+
                           <h4 className="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Carrier Offers</h4>
                           {requestOffers.length === 0 ? (
                               <p className="text-sm text-slate-500 italic">No offers received yet. Your request is visible to {role === 'shipper' ? 'network carriers' : 'transporters'}.</p>
@@ -337,7 +362,7 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
       {/* Carrier Quote Submission Modal */}
       {selectedRequest && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                     <div>
                         <h3 className="text-xl font-bold text-slate-800">Submit Quote</h3>
@@ -358,16 +383,33 @@ const QuoteRequests: React.FC<QuoteRequestsProps> = ({
                         <span className="font-medium text-slate-800">{selectedRequest.vehicleType}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-slate-500">Cargo Details</span>
-                        <span className="font-medium text-slate-800">{selectedRequest.cargoType} • {selectedRequest.weight.toLocaleString()} Kgs</span>
+                        <span className="text-slate-500">Cargo Type</span>
+                        <span className="font-medium text-slate-800">{selectedRequest.cargoType}</span>
                     </div>
-                     {selectedRequest.dimensions && (
+                    <div className="flex justify-between">
+                        <span className="text-slate-500">Total Weight</span>
+                        <span className="font-medium text-slate-800">{selectedRequest.weight.toLocaleString()} Kgs</span>
+                    </div>
+                     
+                     {/* Detailed Parcel Breakdown */}
+                     {selectedRequest.parcels && selectedRequest.parcels.length > 0 ? (
+                         <div className="pt-2 mt-2 border-t border-slate-200">
+                             <p className="text-xs font-bold text-slate-500 uppercase mb-1">Items</p>
+                             {selectedRequest.parcels.map((p, i) => (
+                                 <div key={i} className="flex justify-between text-xs text-slate-700 mb-1">
+                                     <span>{p.quantity} x ({p.length}x{p.width}x{p.height} cm)</span>
+                                     <span>{p.weight} kg/unit</span>
+                                 </div>
+                             ))}
+                         </div>
+                     ) : selectedRequest.dimensions && (
                         <div className="flex justify-between">
                             <span className="text-slate-500">Dimensions</span>
                             <span className="font-medium text-slate-800">{selectedRequest.dimensions.length}x{selectedRequest.dimensions.width}x{selectedRequest.dimensions.height} cm</span>
                         </div>
                     )}
-                    <div className="flex justify-between">
+                    
+                    <div className="flex justify-between pt-2 border-t border-slate-200">
                         <span className="text-slate-500">Service Type</span>
                         <span className="font-medium text-slate-800">{selectedRequest.serviceCategory}</span>
                     </div>

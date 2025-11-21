@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, CheckCircle, X, Loader2, User, Building2, CreditCard, ShieldCheck } from 'lucide-react';
 import { DocumentType, CarrierDocument } from '../types';
@@ -22,6 +23,14 @@ const COMPANY_DOCS: { type: DocumentType; label: string; description: string }[]
 const ShipperOnboarding: React.FC<Props> = ({ onComplete }) => {
     const [entityType, setEntityType] = useState<EntityType | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Form State for Company
+    const [companyForm, setCompanyForm] = useState({
+        companyName: '',
+        vatNumber: '',
+        contactName: '',
+        contactEmail: ''
+    });
     
     // Document State
     const [documents, setDocuments] = useState<CarrierDocument[]>([]);
@@ -69,6 +78,7 @@ const ShipperOnboarding: React.FC<Props> = ({ onComplete }) => {
     const handleSubmit = async () => {
         setIsSubmitting(true);
         // Simulate API call
+        console.log("Submitting Shipper Profile:", { entityType, companyForm, documents });
         await new Promise(resolve => setTimeout(resolve, 2000));
         setIsSubmitting(false);
         onComplete();
@@ -76,6 +86,12 @@ const ShipperOnboarding: React.FC<Props> = ({ onComplete }) => {
 
     const getDocStatus = (type: DocumentType) => documents.find(d => d.type === type);
     const allDocsUploaded = entityType && requiredDocs.every(req => documents.find(d => d.type === req.type));
+    
+    const isCompanyFormValid = entityType === 'Company' 
+        ? (companyForm.companyName.trim() !== '' && companyForm.vatNumber.trim() !== '' && companyForm.contactName.trim() !== '' && companyForm.contactEmail.trim() !== '') 
+        : true;
+
+    const canSubmit = allDocsUploaded && isCompanyFormValid;
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
@@ -114,17 +130,75 @@ const ShipperOnboarding: React.FC<Props> = ({ onComplete }) => {
                         onClick={() => {
                             setEntityType(null);
                             setDocuments([]);
+                            setCompanyForm({
+                                companyName: '',
+                                vatNumber: '',
+                                contactName: '',
+                                contactEmail: ''
+                            });
                         }}
                         className="text-sm text-slate-500 hover:text-emerald-600 mb-4 flex items-center gap-1"
                     >
                         ← Change Account Type
                     </button>
+                    
+                    {/* Company Details Form */}
+                    {entityType === 'Company' && (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 animate-in fade-in slide-in-from-top-4">
+                            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
+                                <Building2 className="text-indigo-600" size={20} />
+                                <h3 className="text-lg font-bold text-slate-800">Company Details</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        placeholder="e.g. Acme Logistics Pty Ltd"
+                                        value={companyForm.companyName}
+                                        onChange={(e) => setCompanyForm({...companyForm, companyName: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">VAT Registration Number</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        placeholder="e.g. 4123456789"
+                                        value={companyForm.vatNumber}
+                                        onChange={(e) => setCompanyForm({...companyForm, vatNumber: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Contact Person Name</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        placeholder="Full Name"
+                                        value={companyForm.contactName}
+                                        onChange={(e) => setCompanyForm({...companyForm, contactName: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Contact Email</label>
+                                    <input 
+                                        type="email"
+                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        placeholder="name@company.com"
+                                        value={companyForm.contactEmail}
+                                        onChange={(e) => setCompanyForm({...companyForm, contactEmail: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
-                            {entityType === 'Individual' ? <User className="text-blue-600" /> : <Building2 className="text-indigo-600" />}
+                            {entityType === 'Individual' ? <User className="text-blue-600" /> : <FileText className="text-indigo-600" />}
                             <div>
-                                <h2 className="text-lg font-bold text-slate-800">{entityType} Verification</h2>
+                                <h2 className="text-lg font-bold text-slate-800">Required Documentation</h2>
                                 <p className="text-sm text-slate-500">Upload the required documents below.</p>
                             </div>
                         </div>
@@ -171,9 +245,9 @@ const ShipperOnboarding: React.FC<Props> = ({ onComplete }) => {
 
                     <button 
                         onClick={handleSubmit}
-                        disabled={!allDocsUploaded || isSubmitting}
+                        disabled={!canSubmit || isSubmitting}
                         className={`w-full py-4 rounded-xl font-bold text-lg flex justify-center items-center gap-2 shadow-lg transition-all ${
-                            allDocsUploaded 
+                            canSubmit 
                             ? 'bg-brand-900 text-white hover:bg-brand-800' 
                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                         }`}

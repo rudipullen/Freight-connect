@@ -1,7 +1,8 @@
 
+
 import React, { useState } from 'react';
 import { UserRole, Listing, QuoteRequest, QuoteOffer, Booking } from '../types';
-import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck, Box, Search } from 'lucide-react';
+import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck, Box, Search, Plus, Trash } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Pie, Cell } from 'recharts';
 import CitySearchInput from './CitySearchInput';
 import { SERVICE_CATEGORIES, VEHICLE_OPTIONS } from '../constants';
@@ -74,15 +75,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     destination: '',
     date: '',
     cargoType: '',
-    weight: '',
     vehicleType: VEHICLE_OPTIONS[0],
     vehicleCustom: '',
     serviceCategory: SERVICE_CATEGORIES[0],
     serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot',
-    includeDims: false,
-    length: '',
-    width: '',
-    height: ''
+    parcels: [{ length: '', width: '', height: '', weight: '', quantity: '1' }]
   });
 
   // Carrier Post Load Form
@@ -194,23 +191,54 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
+  const handleAddParcel = () => {
+      setQuoteForm(prev => ({
+          ...prev,
+          parcels: [...prev.parcels, { length: '', width: '', height: '', weight: '', quantity: '1' }]
+      }));
+  };
+
+  const handleRemoveParcel = (index: number) => {
+      if (quoteForm.parcels.length > 1) {
+          setQuoteForm(prev => ({
+              ...prev,
+              parcels: prev.parcels.filter((_, i) => i !== index)
+          }));
+      }
+  };
+
+  const handleParcelChange = (index: number, field: string, value: string) => {
+      const newParcels: any[] = [...quoteForm.parcels];
+      newParcels[index][field] = value;
+      setQuoteForm(prev => ({ ...prev, parcels: newParcels }));
+  };
+
+  const calculateTotalWeight = () => {
+      return quoteForm.parcels.reduce((acc, p) => {
+          const w = parseFloat(p.weight) || 0;
+          const q = parseInt(p.quantity) || 0;
+          return acc + (w * q);
+      }, 0);
+  };
+
   const handleQuoteSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (onRequestQuote) {
           const finalVehicle = quoteForm.vehicleType === 'Other' ? quoteForm.vehicleCustom : quoteForm.vehicleType;
-          
+          const totalWeight = calculateTotalWeight();
+
           const requestData: any = {
               ...quoteForm,
-              vehicleType: finalVehicle
+              vehicleType: finalVehicle,
+              weight: totalWeight, // Set calculated total weight
+              parcels: quoteForm.parcels.map(p => ({
+                  length: parseFloat(p.length) || 0,
+                  width: parseFloat(p.width) || 0,
+                  height: parseFloat(p.height) || 0,
+                  weight: parseFloat(p.weight) || 0,
+                  quantity: parseInt(p.quantity) || 1
+              }))
           };
-
-          if (quoteForm.includeDims && quoteForm.length && quoteForm.width && quoteForm.height) {
-              requestData.dimensions = {
-                  length: parseFloat(quoteForm.length),
-                  width: parseFloat(quoteForm.width),
-                  height: parseFloat(quoteForm.height)
-              };
-          }
 
           onRequestQuote(requestData);
       }
@@ -220,15 +248,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           destination: '',
           date: '',
           cargoType: '',
-          weight: '',
           vehicleType: VEHICLE_OPTIONS[0],
           vehicleCustom: '',
           serviceCategory: SERVICE_CATEGORIES[0],
           serviceType: 'Door-to-Door',
-          includeDims: false,
-          length: '',
-          width: '',
-          height: ''
+          parcels: [{ length: '', width: '', height: '', weight: '', quantity: '1' }]
       });
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
@@ -676,82 +700,80 @@ export const Dashboard: React.FC<DashboardProps> = ({
                              />
                          </div>
                          
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <div>
-                                 <label className="block text-sm font-medium text-slate-700 mb-1">Cargo Type</label>
-                                 <input 
-                                    type="text" 
-                                    placeholder="e.g. Palletized Goods" 
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                    value={quoteForm.cargoType}
-                                    onChange={(e) => setQuoteForm({...quoteForm, cargoType: e.target.value})}
-                                    required
-                                 />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-slate-700 mb-1">Weight (Kgs)</label>
-                                 <input 
-                                    type="number" 
-                                    placeholder="0" 
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                    value={quoteForm.weight}
-                                    onChange={(e) => setQuoteForm({...quoteForm, weight: e.target.value})}
-                                    required
-                                 />
-                             </div>
-                         </div>
-
-                         {/* Dimensions Toggle and Inputs */}
                          <div>
-                            <label className="flex items-center cursor-pointer gap-2 mb-3">
-                                <input 
-                                    type="checkbox" 
-                                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                                    checked={quoteForm.includeDims}
-                                    onChange={(e) => setQuoteForm({...quoteForm, includeDims: e.target.checked})}
-                                />
-                                <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                                    <Box size={16} /> Include Dimensions (Optional)
-                                </span>
-                            </label>
-                            
-                            {quoteForm.includeDims && (
-                                <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Length (cm)</label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0" 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                            value={quoteForm.length}
-                                            onChange={(e) => setQuoteForm({...quoteForm, length: e.target.value})}
-                                            required={quoteForm.includeDims}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Width (cm)</label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0" 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                            value={quoteForm.width}
-                                            onChange={(e) => setQuoteForm({...quoteForm, width: e.target.value})}
-                                            required={quoteForm.includeDims}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Height (cm)</label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0" 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                            value={quoteForm.height}
-                                            onChange={(e) => setQuoteForm({...quoteForm, height: e.target.value})}
-                                            required={quoteForm.includeDims}
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                             <label className="block text-sm font-medium text-slate-700 mb-1">Cargo Type</label>
+                             <input 
+                                type="text" 
+                                placeholder="e.g. Palletized Goods, Furniture, Machinery" 
+                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                value={quoteForm.cargoType}
+                                onChange={(e) => setQuoteForm({...quoteForm, cargoType: e.target.value})}
+                                required
+                             />
+                         </div>
+                         
+                         {/* Dynamic Parcel List */}
+                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                             <div className="flex justify-between items-center mb-3">
+                                 <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                     <Box size={16} className="text-slate-500" /> Cargo Details
+                                 </h4>
+                                 <span className="text-xs font-bold text-slate-500">
+                                     Total: {calculateTotalWeight().toLocaleString()} kg
+                                 </span>
+                             </div>
+                             
+                             <div className="space-y-3">
+                                 {quoteForm.parcels.map((parcel, idx) => (
+                                     <div key={idx} className="flex flex-wrap md:flex-nowrap gap-2 items-end">
+                                         <div className="w-16">
+                                             <label className="text-[10px] text-slate-500 font-bold block mb-1">Qty</label>
+                                             <input 
+                                                 type="number" min="1"
+                                                 className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded"
+                                                 value={parcel.quantity}
+                                                 onChange={(e) => handleParcelChange(idx, 'quantity', e.target.value)}
+                                                 placeholder="1"
+                                             />
+                                         </div>
+                                         <div className="flex-1 grid grid-cols-3 gap-2">
+                                             <div>
+                                                 <label className="text-[10px] text-slate-500 font-bold block mb-1">Len (cm)</label>
+                                                 <input type="number" className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" placeholder="L" value={parcel.length} onChange={(e) => handleParcelChange(idx, 'length', e.target.value)} />
+                                             </div>
+                                             <div>
+                                                 <label className="text-[10px] text-slate-500 font-bold block mb-1">Wid (cm)</label>
+                                                 <input type="number" className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" placeholder="W" value={parcel.width} onChange={(e) => handleParcelChange(idx, 'width', e.target.value)} />
+                                             </div>
+                                             <div>
+                                                 <label className="text-[10px] text-slate-500 font-bold block mb-1">Hgt (cm)</label>
+                                                 <input type="number" className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" placeholder="H" value={parcel.height} onChange={(e) => handleParcelChange(idx, 'height', e.target.value)} />
+                                             </div>
+                                         </div>
+                                         <div className="w-24">
+                                             <label className="text-[10px] text-slate-500 font-bold block mb-1">Unit Wgt (kg)</label>
+                                             <input type="number" className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded" placeholder="Kg" value={parcel.weight} onChange={(e) => handleParcelChange(idx, 'weight', e.target.value)} />
+                                         </div>
+                                         {quoteForm.parcels.length > 1 && (
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => handleRemoveParcel(idx)}
+                                                 className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded mb-0.5"
+                                             >
+                                                 <Trash size={16} />
+                                             </button>
+                                         )}
+                                     </div>
+                                 ))}
+                             </div>
+                             
+                             <button 
+                                 type="button"
+                                 onClick={handleAddParcel}
+                                 className="mt-3 text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                             >
+                                 <Plus size={14} /> Add Another Item
+                             </button>
                          </div>
 
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
