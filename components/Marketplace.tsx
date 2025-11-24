@@ -1,24 +1,30 @@
 
-import React, { useState } from 'react';
-import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock, Users, ShieldCheck, Star } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Search, MapPin, Calendar, Filter, CheckCircle, X, Truck, Info, Clock, Users, ShieldCheck, Star, Upload, FileText, Plus, Trash2, Paperclip } from 'lucide-react';
 import { MOCK_LISTINGS, VEHICLE_OPTIONS, MOCK_CARRIERS } from '../constants';
-import { Listing, UserRole } from '../types';
+import { Listing, UserRole, CarrierProfile } from '../types';
 import CitySearchInput from './CitySearchInput';
 
 interface Props {
   listings?: Listing[];
   role?: UserRole;
   userEntityId?: string;
+  onBookListing?: (listing: Listing, details: { collection?: string, delivery?: string }, files: File[]) => void;
 }
 
-const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEntityId }) => {
+const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEntityId, onBookListing }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [isViewingDetails, setIsViewingDetails] = useState(false);
+  const [viewingCarrier, setViewingCarrier] = useState<CarrierProfile | null>(null);
   
   // State for address inputs when booking Door-to-Door
   const [addressDetails, setAddressDetails] = useState({ collection: '', delivery: '' });
+  
+  // State for document uploads during booking
+  const [bookingFiles, setBookingFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filters State
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -57,6 +63,7 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
   const handleBook = (listing: Listing) => {
     setSelectedListing(listing);
     setAddressDetails({ collection: '', delivery: '' }); // Reset addresses
+    setBookingFiles([]); // Reset files
     setIsBooking(true);
     setIsViewingDetails(false);
   };
@@ -66,24 +73,47 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
     setIsViewingDetails(true);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setBookingFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setBookingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const confirmBooking = () => {
+    if (!selectedListing) return;
+
     // Validation for Door-to-Door
-    if (selectedListing?.serviceType === 'Door-to-Door') {
+    if (selectedListing.serviceType === 'Door-to-Door') {
       if (!addressDetails.collection.trim() || !addressDetails.delivery.trim()) {
         alert('Please provide both collection and delivery addresses for this Door-to-Door service.');
         return;
       }
     }
 
-    // In a real app, this would call Firebase functions to create a Stripe Payment Intent
-    // and save the addresses to the booking object
-    alert(`Booking confirmed! Funds held in escrow for Listing #${selectedListing?.id}`);
+    if (onBookListing) {
+        onBookListing(selectedListing, addressDetails, bookingFiles);
+    } else {
+        alert(`Booking confirmed! Funds held in escrow for Listing #${selectedListing.id}`);
+    }
+    
     setIsBooking(false);
     setSelectedListing(null);
   };
 
   const getCarrierDetails = (carrierId: string) => {
       return MOCK_CARRIERS.find(c => c.id === carrierId);
+  };
+
+  const handleViewCarrierProfile = (carrierId: string) => {
+    const carrier = getCarrierDetails(carrierId);
+    if (carrier) {
+      setViewingCarrier(carrier);
+    }
   };
 
   return (
@@ -288,11 +318,15 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
 
               <div className="bg-slate-50 p-4 border-t border-slate-100">
                 <div className="flex justify-between items-center mb-3">
-                   <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">
+                   <div 
+                     className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 -ml-1 rounded transition-colors group"
+                     onClick={(e) => { e.stopPropagation(); handleViewCarrierProfile(listing.carrierId); }}
+                     title="View Carrier Profile"
+                   >
+                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600 group-hover:bg-slate-300">
                         {listing.carrierName.substring(0,2)}
                         </div>
-                        <span className="text-xs font-medium text-slate-600">{listing.carrierName}</span>
+                        <span className="text-xs font-medium text-slate-600 group-hover:text-blue-600 group-hover:underline">{listing.carrierName}</span>
                    </div>
                    {(() => {
                        const carrier = getCarrierDetails(listing.carrierId);
@@ -608,7 +642,52 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
                  </div>
               )}
 
-              <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
+              {/* Shipment Documents Upload Section */}
+              <div className="pt-3 mt-3 border-t border-slate-200">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1">
+                        <FileText size={12} className="text-blue-600" /> Carrier Documentation
+                    </h4>
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-medium">Recommended</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                     Carriers require an <strong>Invoice</strong> and <strong>Manifest</strong> before dispatch. Uploading now speeds up collection.
+                  </p>
+                  
+                  <div className="space-y-2 mb-2">
+                      {bookingFiles.map((file, idx) => (
+                          <div key={idx} className="flex justify-between items-center bg-white border border-slate-200 p-2 rounded text-xs shadow-sm">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                  <Paperclip size={12} className="text-slate-400 flex-shrink-0" />
+                                  <span className="truncate font-medium text-slate-700">{file.name}</span>
+                              </div>
+                              <button onClick={() => removeFile(idx)} className="text-slate-400 hover:text-red-500 ml-2">
+                                  <Trash2 size={12} />
+                              </button>
+                          </div>
+                      ))}
+                  </div>
+
+                  <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      multiple 
+                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                      onChange={handleFileSelect}
+                  />
+                  <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full border-2 border-dashed border-blue-200 bg-blue-50/50 rounded-lg p-3 text-xs text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center justify-center gap-2 group"
+                  >
+                      <div className="p-1 bg-white rounded-full text-blue-500 shadow-sm group-hover:scale-110 transition-transform">
+                         <Plus size={12} />
+                      </div>
+                      <span className="font-bold">Upload Invoice / Manifest</span>
+                  </button>
+              </div>
+
+              <div className="flex justify-between border-t border-slate-200 pt-3 mt-3">
                 <span className="text-slate-800 font-bold">Total Escrow Amount</span>
                 <div className="text-right">
                    <span className="text-emerald-600 font-bold block">R {selectedListing.price.toLocaleString()}</span>
@@ -636,6 +715,100 @@ const Marketplace: React.FC<Props> = ({ listings = MOCK_LISTINGS, role, userEnti
                 Pay & Book
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Carrier Profile Modal */}
+      {viewingCarrier && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setViewingCarrier(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+             {/* Header */}
+             <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-white border border-slate-200 rounded-full flex items-center justify-center text-xl font-bold text-slate-600 shadow-sm">
+                        {viewingCarrier.companyName.substring(0,2)}
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800">{viewingCarrier.companyName}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                             {viewingCarrier.verified && (
+                                 <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                     <CheckCircle size={10} /> Verified
+                                 </span>
+                             )}
+                             <span className="flex items-center gap-1 text-xs font-bold text-amber-500">
+                                 <Star size={10} className="fill-current" /> {viewingCarrier.rating}
+                             </span>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={() => setViewingCarrier(null)} className="text-slate-400 hover:text-slate-600">
+                    <X size={24} />
+                </button>
+             </div>
+             
+             {/* Body */}
+             <div className="p-6 space-y-6">
+                {/* Risk Score */}
+                <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                    viewingCarrier.riskScore === 'Low' ? 'bg-emerald-50 border-emerald-100' : 
+                    viewingCarrier.riskScore === 'Medium' ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100'
+                }`}>
+                    <div className="flex items-center gap-3">
+                        <ShieldCheck size={24} className={
+                             viewingCarrier.riskScore === 'Low' ? 'text-emerald-600' : 
+                             viewingCarrier.riskScore === 'Medium' ? 'text-amber-600' : 'text-red-600'
+                        } />
+                        <div>
+                            <p className="text-sm font-bold text-slate-800">Risk Assessment</p>
+                            <p className="text-xs text-slate-500">Based on historical performance</p>
+                        </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                         viewingCarrier.riskScore === 'Low' ? 'bg-emerald-200 text-emerald-800' : 
+                         viewingCarrier.riskScore === 'Medium' ? 'bg-amber-200 text-amber-800' : 'bg-red-200 text-red-800'
+                    }`}>
+                        {viewingCarrier.riskScore || 'Unknown'} Risk
+                    </span>
+                </div>
+
+                {/* Performance Stats */}
+                <div>
+                    <h4 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Performance Metrics</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 uppercase font-bold">Total Jobs</p>
+                            <p className="text-xl font-bold text-slate-800">{viewingCarrier.performance?.totalJobs || 0}</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 uppercase font-bold">On-Time Rate</p>
+                            <p className={`text-xl font-bold ${
+                                (viewingCarrier.performance?.onTimeRate || 0) >= 90 ? 'text-emerald-600' : 'text-amber-600'
+                            }`}>{viewingCarrier.performance?.onTimeRate || 0}%</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 uppercase font-bold">Avg POD Time</p>
+                            <p className="text-xl font-bold text-slate-800">{viewingCarrier.performance?.avgPodUploadTime || 0}h</p>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 uppercase font-bold">Cancellation</p>
+                            <p className={`text-xl font-bold ${
+                                (viewingCarrier.performance?.cancellationRate || 0) <= 5 ? 'text-emerald-600' : 'text-red-600'
+                            }`}>{viewingCarrier.performance?.cancellationRate || 0}%</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Fleet Info */}
+                <div>
+                     <h4 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Fleet Snapshot</h4>
+                     <div className="flex items-center gap-2 text-sm text-slate-600">
+                         <Truck size={16} />
+                         <span>{viewingCarrier.vehicles.length} Active Vehicles Registered</span>
+                     </div>
+                </div>
+             </div>
           </div>
         </div>
       )}

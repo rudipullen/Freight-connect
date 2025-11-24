@@ -1,10 +1,11 @@
 
 
-export type UserRole = 'shipper' | 'carrier' | 'admin';
+export type UserRole = 'shipper' | 'carrier' | 'admin' | 'driver';
 
 export enum BookingStatus {
   PENDING = 'Pending',
   ACCEPTED = 'Accepted',
+  ARRIVED_PICKUP = 'Arrived at Pickup', // New status for Geofencing
   BOOKED = 'Booked',
   COLLECTED = 'Collected', // Represents "Loaded"
   IN_TRANSIT = 'In Transit',
@@ -116,6 +117,15 @@ export interface Review {
   };
 }
 
+export interface ShipmentDocument {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  uploadedAt: string;
+  uploadedBy: 'shipper' | 'carrier';
+}
+
 export interface Booking {
   id: string;
   listingId: string;
@@ -132,6 +142,9 @@ export interface Booking {
   signatureUrl?: string; // Digital signature
   waybillNumber?: string; // Auto-generated waybill
   
+  // Documents
+  shipperDocuments?: ShipmentDocument[]; // Invoices, Manifests, etc.
+
   // Risk Mitigation & Security
   collectedAt?: string; // Timestamp when loaded
   collectionLocation?: { lat: number, lng: number }; // Geo-tag at pickup

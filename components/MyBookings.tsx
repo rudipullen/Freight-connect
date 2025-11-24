@@ -1,8 +1,6 @@
-
-
 import React, { useState, useRef } from 'react';
 import { UserRole, BookingStatus, Dispute, Booking, Review } from '../types';
-import { Upload, FileCheck, MoreHorizontal, AlertTriangle, X, ShieldAlert, Image as ImageIcon, FileText, Plus, Paperclip, Eye, Loader2, CheckCircle, AlertCircle, Box, Truck, Warehouse, CreditCard, Lock, Clock, QrCode, PenTool, Check, Phone, Mail, EyeOff, Map, Shield, Camera, ShieldCheck, KeyRound, MapPin, ExternalLink, Star } from 'lucide-react';
+import { Upload, FileCheck, MoreHorizontal, AlertTriangle, X, ShieldAlert, Image as ImageIcon, FileText, Plus, Paperclip, Eye, Loader2, CheckCircle, AlertCircle, Box, Truck, Warehouse, CreditCard, Lock, Clock, QrCode, PenTool, Check, Phone, Mail, EyeOff, Map, Shield, Camera, ShieldCheck, KeyRound, MapPin, ExternalLink, Star, Printer, Download, Radio } from 'lucide-react';
 
 interface Props {
   role: UserRole;
@@ -15,9 +13,10 @@ interface Props {
   onRevealContact: (bookingId: string) => void;
   onConfirmCollection: (bookingId: string, file: File, isSealed: boolean, sealNumber?: string, location?: {lat: number, lng: number}) => void;
   onRateBooking: (bookingId: string, review: Review) => void;
+  onUploadShipperDoc: (bookingId: string, file: File) => void;
 }
 
-const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings, onAddEvidence, onCompleteDelivery, onVerifyPOD, onUpdateStatus, onRevealContact, onConfirmCollection, onRateBooking }) => {
+const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings, onAddEvidence, onCompleteDelivery, onVerifyPOD, onUpdateStatus, onRevealContact, onConfirmCollection, onRateBooking, onUploadShipperDoc }) => {
   // Local state for bookings to handle UI updates for ratings without full app reload/prop drilling for this demo
   const [localBookings, setLocalBookings] = useState<Booking[]>(initialBookings);
 
@@ -56,11 +55,13 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings
   const podInputRef = useRef<HTMLInputElement>(null);
   const collectionPhotoInputRef = useRef<HTMLInputElement>(null);
   const offloadPhotoInputRef = useRef<HTMLInputElement>(null);
+  const shipperDocInputRef = useRef<HTMLInputElement>(null);
   
   const getStatusColor = (status: BookingStatus) => {
     switch(status) {
       case BookingStatus.PENDING: return 'bg-amber-100 text-amber-800';
       case BookingStatus.ACCEPTED: return 'bg-blue-50 text-blue-800';
+      case BookingStatus.ARRIVED_PICKUP: return 'bg-orange-100 text-orange-800';
       case BookingStatus.COLLECTED: return 'bg-indigo-100 text-indigo-800';
       case BookingStatus.IN_TRANSIT: return 'bg-blue-100 text-blue-800';
       case BookingStatus.AT_HUB: return 'bg-purple-100 text-purple-800';
@@ -158,6 +159,13 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings
     }
   };
 
+  const handleShipperDocSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && viewDetailsBooking) {
+        onUploadShipperDoc(viewDetailsBooking.id, e.target.files[0]);
+        if (shipperDocInputRef.current) shipperDocInputRef.current.value = '';
+    }
+  };
+
   const handleVerifyOTP = () => {
       const booking = localBookings.find(b => b.id === activeDeliveryBooking);
       if (!booking) return;
@@ -171,6 +179,21 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings
 
   const handleSign = () => {
       setSignatureCaptured(true);
+  };
+
+  // --- Geofencing Simulation ---
+  const handleSimulateGeofence = (bookingId: string) => {
+      const confirm = window.confirm("Simulate GPS Arrival?\n\nThis will auto-detect your location as 'Arrived at Destination' and update the booking status.");
+      if (confirm) {
+          onUpdateStatus(bookingId, BookingStatus.AT_HUB);
+      }
+  };
+
+  const handleSimulatePickupArrival = (bookingId: string) => {
+      const confirm = window.confirm("Simulate Arrival at Pickup?\n\nThis will trigger a notification to the shipper that the driver has arrived.");
+      if (confirm) {
+          onUpdateStatus(bookingId, BookingStatus.ARRIVED_PICKUP);
+      }
   };
 
   // --- Rating Logic ---
@@ -427,7 +450,19 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings
                         {/* Carrier Status Flow */}
                         {role === 'carrier' && (
                             <div className="flex gap-2">
-                              {(booking.status === BookingStatus.ACCEPTED || booking.status === BookingStatus.PENDING) && (
+                              {/* Pickup Geofence Button */}
+                              {booking.status === BookingStatus.ACCEPTED && (
+                                 <button 
+                                   onClick={() => handleSimulatePickupArrival(booking.id)}
+                                   className="inline-flex items-center px-3 py-1.5 bg-orange-50 text-orange-700 border border-orange-100 rounded-md text-xs font-bold hover:bg-orange-100 transition-colors"
+                                   title="Simulate Arrival at Pickup"
+                                 >
+                                    <Radio size={14} className="mr-1.5" />
+                                    Arrived Pickup
+                                 </button>
+                              )}
+
+                              {(booking.status === BookingStatus.ACCEPTED || booking.status === BookingStatus.PENDING || booking.status === BookingStatus.ARRIVED_PICKUP) && (
                                 <button 
                                   onClick={() => setActiveCollectionBooking(booking.id)}
                                   className="inline-flex items-center px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-md text-xs font-bold hover:bg-indigo-100 transition-colors"
@@ -445,6 +480,18 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings
                                   <Truck size={14} className="mr-1.5" />
                                   Transit
                                 </button>
+                              )}
+
+                              {/* In Transit - Add Geofencing Simulation */}
+                              {booking.status === BookingStatus.IN_TRANSIT && (
+                                 <button 
+                                   onClick={() => handleSimulateGeofence(booking.id)}
+                                   className="inline-flex items-center px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-md text-xs font-bold hover:bg-purple-100 transition-colors"
+                                   title="Simulate Geofence Arrival"
+                                 >
+                                    <Radio size={14} className="mr-1.5" />
+                                    Auto-Arrive
+                                 </button>
                               )}
 
                               {(booking.status === BookingStatus.IN_TRANSIT || booking.status === BookingStatus.AT_HUB) && (
@@ -620,103 +667,178 @@ const MyBookings: React.FC<Props> = ({ role, disputes, bookings: initialBookings
       {viewDetailsBooking && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in">
             <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl animate-in zoom-in-95 overflow-hidden max-h-[90vh] overflow-y-auto">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-                    <div>
-                        <h3 className="text-xl font-bold text-slate-800">Job Details</h3>
-                        <p className="text-sm text-slate-500">Booking #{viewDetailsBooking.id.toUpperCase()}</p>
-                    </div>
-                    <button onClick={() => setViewDetailsBooking(null)} className="p-2 hover:bg-slate-100 rounded-full">
-                        <X size={24} className="text-slate-400" />
-                    </button>
-                </div>
-                
-                <div className="p-0">
-                    {/* Map Preview */}
-                    <div className="w-full h-64 bg-slate-100 relative">
-                        <iframe 
-                            title="Route Map"
-                            width="100%" 
-                            height="100%" 
-                            frameBorder="0" 
-                            scrolling="no" 
-                            src={`https://maps.google.com/maps?q=${encodeURIComponent(viewDetailsBooking.origin)},+South+Africa+to+${encodeURIComponent(viewDetailsBooking.destination)},+South+Africa&t=&z=7&ie=UTF8&iwloc=&output=embed`}
-                            className="opacity-90 hover:opacity-100 transition-opacity"
-                        ></iframe>
-                        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-bold text-slate-700 pointer-events-none flex items-center gap-2">
-                            <Map size={12} /> Route Preview
-                        </div>
-                    </div>
-
-                    <div className="p-6 space-y-6">
-                        {/* Route Info */}
-                        <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                                <p className="text-xs text-slate-500 uppercase font-bold">Origin</p>
-                                <p className="font-bold text-slate-800 text-lg flex items-center gap-1">
-                                    <MapPin size={16} className="text-blue-500" /> {viewDetailsBooking.origin}
-                                </p>
-                                <p className="text-sm text-slate-500">{new Date(viewDetailsBooking.pickupDate).toLocaleDateString()}</p>
-                            </div>
-                            <div className="mt-2 px-4 flex-1 hidden sm:block">
-                                <div className="flex gap-1 justify-center">
-                                    <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                                    <div className="w-2 h-2 rounded-full bg-blue-300"></div>
-                                    <div className="w-2 h-2 rounded-full bg-blue-200"></div>
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                </div>
-                            </div>
-                            <div className="space-y-1 text-right">
-                                <p className="text-xs text-slate-500 uppercase font-bold">Destination</p>
-                                <p className="font-bold text-slate-800 text-lg flex items-center gap-1 justify-end">
-                                    {viewDetailsBooking.destination} <MapPin size={16} className="text-emerald-500" />
-                                </p>
-                                <p className="text-sm text-slate-500">Est. Delivery: 1-2 Days</p>
-                            </div>
-                        </div>
-
-                        {/* Job Stats */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Financials</p>
-                                <p className="text-lg font-bold text-emerald-600">R {viewDetailsBooking.baseRate?.toLocaleString() ?? '0.00'}</p>
-                                <p className="text-xs text-slate-400">Your Net Earnings</p>
-                            </div>
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Current Status</p>
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(viewDetailsBooking.status)}`}>
-                                    {viewDetailsBooking.status}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Contact Info */}
-                        <div className="p-4 border border-slate-200 rounded-xl">
-                            <h4 className="font-bold text-slate-800 mb-3">Client Details</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                {(() => {
+                    // Ensure we are viewing the latest data for this booking
+                    const currentViewBooking = localBookings.find(b => b.id === viewDetailsBooking.id) || viewDetailsBooking;
+                    
+                    return (
+                        <>
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
                                 <div>
-                                    <p className="text-slate-500">Company</p>
-                                    <p className="font-medium">{viewDetailsBooking.shipperName}</p>
+                                    <h3 className="text-xl font-bold text-slate-800">Job Details</h3>
+                                    <p className="text-sm text-slate-500">Booking #{currentViewBooking.id.toUpperCase()}</p>
                                 </div>
-                                <div>
-                                    <p className="text-slate-500">Contact</p>
-                                    <p className="font-medium flex items-center gap-2">
-                                        {viewDetailsBooking.contactRevealed ? viewDetailsBooking.shipperPhone : '• • • • • •'}
-                                        {!viewDetailsBooking.contactRevealed && <span className="text-[10px] text-slate-400">(Hidden)</span>}
-                                    </p>
+                                <button onClick={() => setViewDetailsBooking(null)} className="p-2 hover:bg-slate-100 rounded-full">
+                                    <X size={24} className="text-slate-400" />
+                                </button>
+                            </div>
+                            
+                            <div className="p-0">
+                                {/* Map Preview */}
+                                <div className="w-full h-64 bg-slate-100 relative">
+                                    <iframe 
+                                        title="Route Map"
+                                        width="100%" 
+                                        height="100%" 
+                                        frameBorder="0" 
+                                        scrolling="no" 
+                                        src={`https://maps.google.com/maps?q=${encodeURIComponent(currentViewBooking.origin)},+South+Africa+to+${encodeURIComponent(currentViewBooking.destination)},+South+Africa&t=&z=7&ie=UTF8&iwloc=&output=embed`}
+                                        className="opacity-90 hover:opacity-100 transition-opacity"
+                                    ></iframe>
+                                    <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-bold text-slate-700 pointer-events-none flex items-center gap-2">
+                                        <Map size={12} /> Route Preview
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-6">
+                                    {/* Route Info */}
+                                    <div className="flex items-start justify-between">
+                                        <div className="space-y-1">
+                                            <p className="text-xs text-slate-500 uppercase font-bold">Origin</p>
+                                            <p className="font-bold text-slate-800 text-lg flex items-center gap-1">
+                                                <MapPin size={16} className="text-blue-500" /> {currentViewBooking.origin}
+                                            </p>
+                                            <p className="text-sm text-slate-500">{new Date(currentViewBooking.pickupDate).toLocaleDateString()}</p>
+                                        </div>
+                                        <div className="mt-2 px-4 flex-1 hidden sm:block">
+                                            <div className="flex gap-1 justify-center">
+                                                <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                                <div className="w-2 h-2 rounded-full bg-blue-300"></div>
+                                                <div className="w-2 h-2 rounded-full bg-blue-200"></div>
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1 text-right">
+                                            <p className="text-xs text-slate-500 uppercase font-bold">Destination</p>
+                                            <p className="font-bold text-slate-800 text-lg flex items-center gap-1 justify-end">
+                                                {currentViewBooking.destination} <MapPin size={16} className="text-emerald-500" />
+                                            </p>
+                                            <p className="text-sm text-slate-500">Est. Delivery: 1-2 Days</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Job Stats */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                            <p className="text-xs text-slate-500 uppercase font-bold mb-1">Financials</p>
+                                            <p className="text-lg font-bold text-emerald-600">R {currentViewBooking.baseRate?.toLocaleString() ?? '0.00'}</p>
+                                            <p className="text-xs text-slate-400">Your Net Earnings</p>
+                                        </div>
+                                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                            <p className="text-xs text-slate-500 uppercase font-bold mb-1">Current Status</p>
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(currentViewBooking.status)}`}>
+                                                {currentViewBooking.status}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Contact Info */}
+                                    <div className="p-4 border border-slate-200 rounded-xl">
+                                        <h4 className="font-bold text-slate-800 mb-3">Client Details</h4>
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <p className="text-slate-500">Company</p>
+                                                <p className="font-medium">{currentViewBooking.shipperName}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500">Contact</p>
+                                                <p className="font-medium flex items-center gap-2">
+                                                    {currentViewBooking.contactRevealed ? currentViewBooking.shipperPhone : '• • • • • •'}
+                                                    {!currentViewBooking.contactRevealed && <span className="text-[10px] text-slate-400">(Hidden)</span>}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Shipment Documentation Section */}
+                                    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50/50">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                                <FileText size={16} className="text-blue-600" />
+                                                Shipment Documentation
+                                            </h4>
+                                            {role === 'shipper' && (
+                                                <>
+                                                    <input 
+                                                        type="file" 
+                                                        ref={shipperDocInputRef} 
+                                                        className="hidden" 
+                                                        onChange={handleShipperDocSelect}
+                                                        accept=".pdf,.png,.jpg,.jpeg"
+                                                    />
+                                                    <button 
+                                                        onClick={() => shipperDocInputRef.current?.click()}
+                                                        className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100 flex items-center gap-1 transition-colors"
+                                                    >
+                                                        <Plus size={12} /> Add Document
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                        
+                                        {!currentViewBooking.shipperDocuments || currentViewBooking.shipperDocuments.length === 0 ? (
+                                            <p className="text-xs text-slate-500 italic text-center py-2">No documents provided yet.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {currentViewBooking.shipperDocuments.map((doc, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between p-2 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                                        <div className="flex items-center gap-2 overflow-hidden">
+                                                            <div className="p-1.5 bg-blue-50 text-blue-600 rounded">
+                                                                <FileText size={14} />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-bold text-slate-800 truncate">{doc.name}</p>
+                                                                <p className="text-[10px] text-slate-400">
+                                                                    {new Date(doc.uploadedAt).toLocaleDateString()} • {doc.type.split('/')[1] || 'DOC'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <a 
+                                                                href={doc.url} 
+                                                                target="_blank" 
+                                                                rel="noreferrer" 
+                                                                className="text-xs text-slate-600 hover:text-blue-600 flex items-center gap-1 px-2 py-1 hover:bg-slate-50 rounded border border-transparent hover:border-slate-200 transition-colors"
+                                                            >
+                                                                <Printer size={12} /> Print
+                                                            </a>
+                                                            <a 
+                                                                href={doc.url} 
+                                                                download
+                                                                className="text-xs text-slate-600 hover:text-emerald-600 flex items-center gap-1 px-2 py-1 hover:bg-slate-50 rounded border border-transparent hover:border-slate-200 transition-colors"
+                                                            >
+                                                                <Download size={12} />
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                    <button 
-                    onClick={() => setViewDetailsBooking(null)}
-                    className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors"
-                    >
-                        Close Details
-                    </button>
-                </div>
+                            
+                            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                                <button 
+                                onClick={() => setViewDetailsBooking(null)}
+                                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors"
+                                >
+                                    Close Details
+                                </button>
+                            </div>
+                        </>
+                    );
+                })()}
             </div>
         </div>
       )}
