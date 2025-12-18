@@ -67,16 +67,46 @@ export interface Booking {
   id: string;
   listingId: string;
   shipperId: string;
+  shipperName?: string;
   carrierId: string;
+  carrierName?: string;
   status: BookingStatus;
   origin: string;
   destination: string;
   pickupDate: string;
   price: number;
   podUrl?: string;
+  pickupPhotoUrl?: string;
   escrowStatus: 'Pending' | 'Secured' | 'Released';
   deliveryNotes?: string;
   waybillId: string;
+}
+
+export interface PlatformSettings {
+  globalMarkupPercent: number;
+  autoReleaseHours: number;
+  isJobPostingEnabled: boolean;
+  isRegistrationOpen: boolean;
+  otpRequiredOnDelivery: boolean;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'Escrow' | 'Payout' | 'Refund';
+  amount: number;
+  status: 'Pending' | 'Completed' | 'Failed';
+  timestamp: string;
+  referenceId: string;
+  entityName: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  adminName: string;
+  action: string;
+  targetType: 'Carrier' | 'Shipper' | 'Booking' | 'Settings';
+  targetId: string;
+  timestamp: string;
 }
 
 export interface CarrierProfile {
@@ -97,6 +127,16 @@ export interface CarrierProfile {
   };
 }
 
+export interface ShipperProfile {
+  id: string;
+  companyName: string;
+  activeBookings: number;
+  totalSpend: number;
+  rating: number;
+  disputeRate: number;
+  status: 'Active' | 'Suspended';
+}
+
 export interface DisputeEvidence {
   id: string;
   uploadedBy: 'shipper' | 'carrier' | 'admin';
@@ -111,7 +151,7 @@ export interface Dispute {
   id: string;
   bookingId: string;
   reason: string;
-  status: 'Open' | 'Resolved';
+  status: 'Open' | 'In Review' | 'Resolved';
   createdAt: string;
   evidence: DisputeEvidence[];
 }

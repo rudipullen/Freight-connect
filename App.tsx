@@ -16,20 +16,29 @@ import {
   Send,
   Wallet
 } from 'lucide-react';
-import { UserRole, Listing, Dispute, DisputeEvidence, Booking, BookingStatus } from './types';
+import { UserRole, Listing, Dispute, DisputeEvidence, Booking, BookingStatus, PlatformSettings, AuditLogEntry, ShipperProfile } from './types';
 import Dashboard from './components/Dashboard';
 import Marketplace from './components/Marketplace';
 import AdminPanel from './components/AdminPanel';
 import MyBookings from './components/MyBookings';
 import CarrierOnboarding from './components/CarrierOnboarding';
 import { getLogisticsAdvice } from './services/geminiService';
-import { MOCK_LISTINGS, MOCK_DISPUTES, MOCK_BOOKINGS } from './constants';
+import { MOCK_LISTINGS, MOCK_DISPUTES, MOCK_BOOKINGS, MOCK_AUDIT_LOGS, MOCK_SHIPPERS } from './constants';
 
 const App: React.FC = () => {
-  const [role, setRole] = useState<UserRole>('carrier');
+  const [role, setRole] = useState<UserRole>('admin');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // Platform settings for Owner Control
+  const [settings, setSettings] = useState<PlatformSettings>({
+    globalMarkupPercent: 15,
+    autoReleaseHours: 24,
+    isJobPostingEnabled: true,
+    isRegistrationOpen: true,
+    otpRequiredOnDelivery: true
+  });
+
   // Centralized Data State
   const [listings, setListings] = useState<Listing[]>(MOCK_LISTINGS);
   const [bookings, setBookings] = useState<Booking[]>(MOCK_BOOKINGS.map(b => ({
@@ -38,6 +47,8 @@ const App: React.FC = () => {
     waybillId: 'WB-' + b.id.toUpperCase()
   } as Booking)));
   const [disputes, setDisputes] = useState<Dispute[]>(MOCK_DISPUTES);
+  const [shippers, setShippers] = useState<ShipperProfile[]>(MOCK_SHIPPERS);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(MOCK_AUDIT_LOGS);
   const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<{id: number, text: string, time: string}[]>([
     { id: 1, text: "Welcome to FreightConnect!", time: "Just now" }
@@ -80,7 +91,6 @@ const App: React.FC = () => {
 
   const handleBookingStatusUpdate = (bookingId: string, newStatus: BookingStatus) => {
     setBookings(prev => prev.map(b => b.id === bookingId ? {...b, status: newStatus} : b));
-    
     if (newStatus === BookingStatus.DELIVERED) {
        setNotifications(prev => [{
          id: Date.now(),
@@ -111,10 +121,26 @@ const App: React.FC = () => {
   
   const handleResolveDispute = (disputeId: string) => {
     setDisputes(prev => prev.map(d => d.id === disputeId ? { ...d, status: 'Resolved' } : d));
+    setAuditLogs(prev => [{
+      id: 'a-' + Date.now(),
+      adminName: 'Owner Admin',
+      action: 'Resolved Dispute',
+      targetType: 'Booking',
+      targetId: disputeId,
+      timestamp: new Date().toISOString()
+    }, ...prev]);
   };
 
   const handleVerifyCarrier = (carrierId: string) => {
     setCarrierStatus('verified');
+    setAuditLogs(prev => [{
+      id: 'a-' + Date.now(),
+      adminName: 'Owner Admin',
+      action: 'Verified Carrier',
+      targetType: 'Carrier',
+      targetId: carrierId,
+      timestamp: new Date().toISOString()
+    }, ...prev]);
   };
 
   const handleRequestQuote = (quoteData: any) => {
@@ -145,6 +171,19 @@ const App: React.FC = () => {
             available: prev.available + booking.price
           }));
       }
+  };
+
+  const handleSettingsUpdate = (newSettings: PlatformSettings) => {
+    setSettings(newSettings);
+    setAuditLogs(prev => [{
+      id: 'a-' + Date.now(),
+      adminName: 'Owner Admin',
+      action: 'Updated Platform Settings',
+      targetType: 'Settings',
+      targetId: 'global',
+      timestamp: new Date().toISOString()
+    }, ...prev]);
+    setNotifications(prev => [{ id: Date.now(), text: "Global settings updated.", time: "Just now" }, ...prev]);
   };
 
   const handleSendMessage = async () => {
@@ -202,6 +241,12 @@ const App: React.FC = () => {
       case 'admin':
         return <AdminPanel 
             disputes={disputes} 
+            listings={listings}
+            bookings={bookings}
+            shippers={shippers}
+            auditLogs={auditLogs}
+            settings={settings}
+            onUpdateSettings={handleSettingsUpdate}
             onResolveDispute={handleResolveDispute} 
             onVerifyCarrier={handleVerifyCarrier} 
         />;
@@ -242,7 +287,7 @@ const App: React.FC = () => {
                 {role === 'admin' ? 'AD' : (role === 'carrier' ? 'SL' : 'AS')}
               </div>
               <div>
-                <p className="text-white font-bold text-sm">{role === 'admin' ? 'Admin' : (role === 'carrier' ? 'Swift Logistics' : 'Acme Supplies')}</p>
+                <p className="text-white font-bold text-sm truncate max-w-[120px]">{role === 'admin' ? 'Owner Admin' : (role === 'carrier' ? 'Swift Logistics' : 'Acme Supplies')}</p>
                 <p className="text-[10px] text-brand-300 uppercase tracking-widest">{role}</p>
               </div>
            </div>
@@ -263,7 +308,7 @@ const App: React.FC = () => {
             </button>
           )}
           <button onClick={() => { setActiveTab('marketplace'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'marketplace' ? 'bg-emerald-500 text-white shadow-lg' : 'hover:bg-brand-800'}`}>
-            <Search size={20} /><span className="font-medium">{role === 'carrier' ? 'Market Leads' : 'Find Trucks'}</span>
+            <Search size={20} /><span className="font-medium">{role === 'admin' ? 'Active Listings' : (role === 'carrier' ? 'Market Leads' : 'Find Trucks')}</span>
           </button>
           <button onClick={() => { setActiveTab('bookings'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'bookings' ? 'bg-emerald-500 text-white shadow-lg' : 'hover:bg-brand-800'}`}>
             <FileText size={20} /><span className="font-medium">{role === 'carrier' ? 'Active Jobs' : 'My Bookings'}</span>
@@ -274,16 +319,6 @@ const App: React.FC = () => {
              </button>
           )}
         </nav>
-
-        {role === 'carrier' && (
-          <div className="p-4 mx-4 mb-4 bg-brand-800 rounded-xl border border-brand-700">
-            <p className="text-[10px] text-brand-400 uppercase font-bold mb-1">Available Funds</p>
-            <div className="flex items-center justify-between">
-              <span className="text-white font-bold">R {wallet.available.toLocaleString()}</span>
-              <Wallet size={16} className="text-emerald-400" />
-            </div>
-          </div>
-        )}
       </aside>
 
       <main className="flex-1 overflow-y-auto h-screen bg-slate-50">

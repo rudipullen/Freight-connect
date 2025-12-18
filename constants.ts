@@ -1,5 +1,5 @@
 
-import { Booking, BookingStatus, CarrierProfile, Listing, Dispute } from "./types";
+import { Booking, BookingStatus, CarrierProfile, Listing, Dispute, AuditLogEntry, ShipperProfile } from "./types";
 
 export const SA_CITIES = [
   "Johannesburg", "Pretoria", "Cape Town", "Durban", "Port Elizabeth", 
@@ -10,14 +10,21 @@ export const SA_CITIES = [
   "Krugersdorp", "Witbank", "Potchefstroom", "Paarl", "Worcester"
 ];
 
+export const MOCK_SHIPPERS: ShipperProfile[] = [
+  { id: 's1', companyName: 'Acme Supplies Ltd', activeBookings: 3, totalSpend: 145000, rating: 4.9, disputeRate: 2, status: 'Active' },
+  { id: 's2', companyName: 'Global Retailers', activeBookings: 0, totalSpend: 28000, rating: 3.5, disputeRate: 15, status: 'Active' },
+  { id: 's3', companyName: 'Heavy Parts Co', activeBookings: 8, totalSpend: 560000, rating: 4.7, disputeRate: 5, status: 'Active' }
+];
+
 export const MOCK_CARRIERS: CarrierProfile[] = [
   {
     id: 'c1',
     companyName: 'Swift Logistics',
+    regNumber: '2010/123456/07',
+    address: '123 Logistics Way, Johannesburg, 2000',
     verified: true,
     rating: 4.8,
     vehicles: [
-      // Added missing properties: hasTailLift, isHazmatCertified, isRefrigerated, isAvailable
       { id: 'v1', type: 'Refrigerated', regNumber: 'ABC-123', capacityTons: 20, capacityPallets: 24, hasTailLift: true, isHazmatCertified: false, isRefrigerated: true, isAvailable: true },
       { id: 'v2', type: 'Flatbed', regNumber: 'XYZ-789', capacityTons: 30, capacityPallets: 0, hasTailLift: false, isHazmatCertified: false, isRefrigerated: false, isAvailable: true }
     ]
@@ -25,10 +32,11 @@ export const MOCK_CARRIERS: CarrierProfile[] = [
   {
     id: 'c2',
     companyName: 'HaulRight Trans',
+    regNumber: '2015/987654/07',
+    address: '45 Haulage St, Cape Town, 8000',
     verified: false,
     rating: 4.2,
     vehicles: [
-      // Added missing properties: hasTailLift, isHazmatCertified, isRefrigerated, isAvailable
       { id: 'v3', type: 'Box Truck', regNumber: 'HUL-555', capacityTons: 8, capacityPallets: 10, hasTailLift: true, isHazmatCertified: false, isRefrigerated: false, isAvailable: true }
     ]
   }
@@ -47,9 +55,8 @@ export const MOCK_LISTINGS: Listing[] = [
     availableTons: 15,
     availablePallets: 20,
     baseRate: 12000,
-    price: 13800, // 15% markup
+    price: 13800,
     isBooked: false,
-    // Added missing property: driverAssistance
     driverAssistance: false,
   },
   {
@@ -66,25 +73,7 @@ export const MOCK_LISTINGS: Listing[] = [
     baseRate: 8500,
     price: 9775,
     isBooked: false,
-    // Added missing property: driverAssistance
     driverAssistance: false,
-  },
-  {
-    id: 'l3',
-    carrierId: 'c2',
-    carrierName: 'HaulRight Trans',
-    origin: 'Port Elizabeth',
-    destination: 'Bloemfontein',
-    date: '2024-06-20',
-    vehicleType: 'Box Truck',
-    serviceType: 'Door-to-Door',
-    availableTons: 5,
-    availablePallets: 6,
-    baseRate: 4000,
-    price: 4600,
-    isBooked: false,
-    // Added missing property: driverAssistance
-    driverAssistance: true,
   }
 ];
 
@@ -93,13 +82,15 @@ export const MOCK_BOOKINGS: Booking[] = [
     id: 'b1',
     listingId: 'l10',
     shipperId: 's1',
+    shipperName: 'Acme Supplies Ltd',
     carrierId: 'c1',
+    carrierName: 'Swift Logistics',
     status: BookingStatus.IN_TRANSIT,
     origin: 'Cape Town',
     destination: 'Johannesburg',
     pickupDate: '2024-06-01',
     price: 14000,
-    // Added missing properties: escrowStatus, waybillId
+    pickupPhotoUrl: 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&q=80&w=400',
     escrowStatus: 'Secured',
     waybillId: 'WB-B1'
   },
@@ -107,13 +98,14 @@ export const MOCK_BOOKINGS: Booking[] = [
     id: 'b2',
     listingId: 'l11',
     shipperId: 's1',
+    shipperName: 'Acme Supplies Ltd',
     carrierId: 'c1',
+    carrierName: 'Swift Logistics',
     status: BookingStatus.DISPUTED,
     origin: 'Nelspruit',
     destination: 'Maputo',
     pickupDate: '2024-05-28',
     price: 8500,
-    // Added missing properties: escrowStatus, waybillId
     escrowStatus: 'Pending',
     waybillId: 'WB-B2'
   }
@@ -132,10 +124,16 @@ export const MOCK_DISPUTES: Dispute[] = [
         uploadedBy: 'shipper',
         uploaderName: 'Acme Supplies',
         fileName: 'damaged_goods_01.jpg',
-        fileUrl: '#',
+        fileUrl: 'https://images.unsplash.com/photo-1594818379496-da1e345b0ded?auto=format&fit=crop&q=80&w=400',
         fileType: 'image',
         uploadedAt: '2024-06-01T10:30:00Z'
       }
     ]
   }
+];
+
+export const MOCK_AUDIT_LOGS: AuditLogEntry[] = [
+  { id: 'a1', adminName: 'Sarah Admin', action: 'Approved Documents', targetType: 'Carrier', targetId: 'c1', timestamp: '2024-06-01T09:12:00Z' },
+  { id: 'a2', adminName: 'System', action: 'Auto-Release Payout', targetType: 'Booking', targetId: 'b1', timestamp: '2024-06-01T10:00:00Z' },
+  { id: 'a3', adminName: 'Sarah Admin', action: 'Modified Global Markup', targetType: 'Settings', targetId: 'global', timestamp: '2024-06-01T11:45:00Z' }
 ];
