@@ -2,11 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#3CB371" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="FreightConnect" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FreightConnect</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -15,26 +11,12 @@
           extend: {
             colors: {
               brand: {
-                50: '#f0f8ff',
-                100: '#d6eaf8',
-                500: '#4682B4', // Blue (#4682B4)
-                600: '#35648b',
-                900: '#1c3347',
-              },
-              // Override slate to ensure text is Blue (#4682B4)
-              slate: {
-                50: '#f2fcf5', // Very light hint of green for card backgrounds to blend
-                100: '#e1eff8',
-                200: '#c4e0f3',
-                300: '#9bcceb',
-                400: '#6eb2e1',
-                500: '#5f9ea0', // Lighter blue for secondary text
-                600: '#4682B4', // Blue
-                700: '#4682B4', // Blue
-                800: '#4682B4', // Blue
-                900: '#4682B4', // Blue (#4682B4) - Primary Text
-              },
-              mainGreen: '#3CB371', // Green (#3CB371) - Background
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                500: '#0ea5e9',
+                600: '#0284c7',
+                900: '#0c4a6e',
+              }
             }
           }
         }
@@ -48,18 +30,6 @@
       .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
-      }
-      /* Prevent pull-to-refresh on mobile to allow app-like feel */
-      body {
-        overscroll-behavior-y: none;
-        background-color: #3CB371; /* Fallback */
-      }
-      /* Safe area padding for notched phones */
-      .safe-area-top {
-        padding-top: env(safe-area-inset-top);
-      }
-      .safe-area-bottom {
-        padding-bottom: env(safe-area-inset-bottom);
       }
     </style>
   <script type="importmap">

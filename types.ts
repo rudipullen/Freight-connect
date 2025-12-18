@@ -1,28 +1,21 @@
 
-
-export type UserRole = 'shipper' | 'carrier' | 'admin' | 'driver';
+export type UserRole = 'shipper' | 'carrier' | 'admin';
 
 export enum BookingStatus {
   PENDING = 'Pending',
   ACCEPTED = 'Accepted',
-  ARRIVED_PICKUP = 'Arrived at Pickup', // New status for Geofencing
-  BOOKED = 'Booked',
-  COLLECTED = 'Collected', // Represents "Loaded"
+  ARRIVED_AT_PICKUP = 'Arrived at Pickup',
+  LOADED = 'Loaded & Secure',
   IN_TRANSIT = 'In Transit',
-  AT_HUB = 'At Hub',
+  ARRIVED_AT_DELIVERY = 'Arrived at Delivery',
   DELIVERED = 'Delivered',
   COMPLETED = 'Completed',
   DISPUTED = 'Disputed'
 }
 
-export type DocumentType = 
-  | 'Company Registration' 
-  | 'COF' 
-  | 'GIT Insurance' 
-  | 'Driver PrDP' 
-  | 'ID Document' 
-  | 'VAT Registration' 
-  | 'Payment Rep ID';
+export type CargoType = 'Palletised' | 'Loose' | 'Refrigerated' | 'Hazardous' | 'Abnormal' | 'Container';
+
+export type DocumentType = 'Company Registration' | 'COF' | 'GIT Insurance' | 'Driver PrDP' | 'Vehicle License';
 
 export interface CarrierDocument {
   id: string;
@@ -42,46 +35,12 @@ export interface Vehicle {
   regNumber: string;
   capacityTons: number;
   capacityPallets: number;
+  maxFloorSpace?: number; // In LDM
+  hasTailLift: boolean;
+  isHazmatCertified: boolean;
+  isRefrigerated: boolean;
+  isAvailable: boolean;
   photos?: string[];
-  providesLoadingAssist: boolean; // New field for loading/offloading help
-}
-
-export interface CarrierPerformance {
-  totalJobs: number;
-  onTimeRate: number; // Percentage 0-100
-  avgPodUploadTime: number; // Hours
-  cancellationRate: number; // Percentage
-}
-
-export interface CarrierProfile {
-  id: string;
-  companyName: string;
-  verified: boolean;
-  rating: number;
-  vehicles: Vehicle[];
-  documents?: CarrierDocument[];
-  performance?: CarrierPerformance;
-  riskScore?: 'Low' | 'Medium' | 'High';
-}
-
-export interface ShipperProfile {
-  id: string;
-  entityType: 'Individual' | 'Company';
-  name: string; // Company Name or Individual Name
-  verified: boolean;
-  documents: CarrierDocument[];
-  rating?: number;
-}
-
-export interface RiskAlert {
-  id: string;
-  severity: 'High' | 'Medium' | 'Low';
-  category: 'Fraud' | 'Compliance' | 'Service';
-  message: string;
-  entityId: string;
-  entityName: string;
-  timestamp: string;
-  status: 'New' | 'Investigating' | 'Resolved';
 }
 
 export interface Listing {
@@ -90,40 +49,18 @@ export interface Listing {
   carrierName: string;
   origin: string;
   destination: string;
-  date: string; // ISO date string
-  collectionWindow?: string; // e.g. "08:00 - 12:00"
-  deliveryWindow?: string;   // e.g. "14:00 - 16:00"
-  transitTime?: string; // e.g. "Overnight", "2-3 Days"
+  stopovers?: string[];
+  date: string;
   vehicleType: string;
-  serviceCategory: string; // Added service category (Overnight, Economy, etc.)
+  cargoType?: CargoType;
   serviceType: 'Door-to-Door' | 'Depot-to-Depot';
   availableTons: number;
   availablePallets: number;
-  availableDetails?: string; // Free text for space available
-  includesLoadingAssist: boolean; // New field for listing specific assistance
-  gitCover: boolean; // Indicates if GIT insurance is included
-  gitLimit?: number; // The limit of the GIT cover in ZAR
+  availableDetails?: string;
   baseRate: number;
-  price: number; // Includes markup
+  price: number;
   isBooked: boolean;
-}
-
-export interface Review {
-  rating: number; // 1-5 Stars
-  comment: string;
-  createdAt: string;
-  criteria: {
-    [key: string]: number; // e.g. "Punctuality": 5, "Dock Access": 3
-  };
-}
-
-export interface ShipmentDocument {
-  id: string;
-  name: string;
-  url: string;
-  type: string;
-  uploadedAt: string;
-  uploadedBy: 'shipper' | 'carrier';
+  driverAssistance: boolean;
 }
 
 export interface Booking {
@@ -132,42 +69,32 @@ export interface Booking {
   shipperId: string;
   carrierId: string;
   status: BookingStatus;
-  paymentStatus: 'Escrow' | 'Released' | 'Hold' | 'Refunded'; // Added for payment safety
   origin: string;
   destination: string;
   pickupDate: string;
-  baseRate?: number; // Carrier earnings
-  price: number; // Shipper cost (includes markup)
+  price: number;
   podUrl?: string;
-  signatureUrl?: string; // Digital signature
-  waybillNumber?: string; // Auto-generated waybill
-  
-  // Documents
-  shipperDocuments?: ShipmentDocument[]; // Invoices, Manifests, etc.
+  escrowStatus: 'Pending' | 'Secured' | 'Released';
+  deliveryNotes?: string;
+  waybillId: string;
+}
 
-  // Risk Mitigation & Security
-  collectedAt?: string; // Timestamp when loaded
-  collectionLocation?: { lat: number, lng: number }; // Geo-tag at pickup
-  deliveredAt?: string; // Timestamp when delivered
-  deliveryLocation?: { lat: number, lng: number }; // Geo-tag at delivery
-  loadingPhotoUrl?: string; // Proof of load
-  deliveryPhotoUrl?: string; // Proof of off-load/condition at delivery
-  truckSealed?: boolean; // Security question answer
-  sealNumber?: string; // Optional seal ID
-  deliveryOtp?: string; // 6-digit PIN for delivery verification
-
-  // Contact Details (Hidden until booking)
-  shipperName?: string;
-  shipperPhone?: string;
-  shipperEmail?: string;
-  carrierName?: string;
-  carrierPhone?: string;
-  carrierEmail?: string;
-  contactRevealed?: boolean; // To track if contact was shown
-
-  // Two-way Ratings
-  shipperReview?: Review; // The review LEFT BY the Shipper FOR the Carrier
-  carrierReview?: Review; // The review LEFT BY the Carrier FOR the Shipper
+export interface CarrierProfile {
+  id: string;
+  companyName: string;
+  regNumber: string;
+  vatNumber?: string;
+  address: string;
+  verified: boolean;
+  rating: number;
+  vehicles: Vehicle[];
+  documents?: CarrierDocument[];
+  bankDetails?: {
+    bankName: string;
+    accountNumber: string;
+    branchCode: string;
+    accountType: string;
+  };
 }
 
 export interface DisputeEvidence {
@@ -187,46 +114,4 @@ export interface Dispute {
   status: 'Open' | 'Resolved';
   createdAt: string;
   evidence: DisputeEvidence[];
-}
-
-export interface Parcel {
-  length: number;
-  width: number;
-  height: number;
-  weight: number;
-  quantity: number;
-}
-
-export interface QuoteRequest {
-  id: string;
-  shipperId: string;
-  shipperName: string; // Mock name
-  origin: string;
-  destination: string;
-  vehicleType: string;
-  serviceCategory: string; // Added service category
-  serviceType: 'Door-to-Door' | 'Depot-to-Depot';
-  cargoType: string;
-  weight: number; // Total weight
-  date: string;
-  status: 'Open' | 'Booked' | 'Closed';
-  createdAt: string;
-  dimensions?: {
-      length: number;
-      width: number;
-      height: number;
-  };
-  parcels?: Parcel[]; // Multiple parcels support
-}
-
-export interface QuoteOffer {
-  id: string;
-  requestId: string;
-  carrierId: string;
-  carrierName: string;
-  amount: number; // Carrier earning
-  transitTime?: string; // Carrier's promised transit time (SLA)
-  message?: string;
-  status: 'Pending' | 'Accepted' | 'Declined';
-  createdAt: string;
 }

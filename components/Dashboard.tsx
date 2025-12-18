@@ -1,713 +1,584 @@
 
 import React, { useState } from 'react';
-import { UserRole, Listing, QuoteRequest, QuoteOffer, Booking } from '../types';
-import { Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, MessageSquare, TrendingDown, Percent, TrendingUp, BarChart2, PieChart, Hand, ShieldCheck, Box, Search, Plus, Trash, Zap, ChevronLeft, Send } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Pie, Cell } from 'recharts';
+import { UserRole, Listing, CargoType } from '../types';
+import { 
+  Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, 
+  Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, 
+  Trash, ArrowRightLeft, ShieldCheck, Wallet, Download, ExternalLink,
+  ChevronRight
+} from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CitySearchInput from './CitySearchInput';
-import { SERVICE_CATEGORIES, VEHICLE_OPTIONS } from '../constants';
-
-export interface Lane {
-  origin: string;
-  destination: string;
-}
 
 interface DashboardProps {
   role: UserRole;
   isPosting?: boolean;
   verificationStatus?: 'unverified' | 'pending' | 'verified';
   listings?: Listing[];
-  bookings?: Booking[];
-  notifications?: {id: number, text: string, time: string, audience?: 'shipper' | 'carrier' | 'all'}[];
-  quoteRequests?: QuoteRequest[];
-  quoteOffers?: QuoteOffer[];
-  preferredLanes?: Lane[];
+  notifications?: {id: number, text: string, time: string}[];
+  quoteRequests?: any[];
+  wallet?: { escrow: number; available: number };
+  onPayout?: () => void;
   onPostListing?: (listing: Listing) => void;
   onUpdateListing?: (listing: Listing) => void;
   onDeleteListing?: (id: string) => void;
-  onRequestQuote?: (quote: any) => void;
-  onAcceptOffer?: (offerId: string, addresses?: { collection?: string, delivery?: string }) => void;
-  onDeclineOffer?: (offerId: string) => void;
-  onUpdateLanes?: (lanes: Lane[]) => void;
-  onBypassVerification?: () => void;
+  onRequestQuote?: (quoteData: any) => void;
+  onCancelQuote?: (id: string) => void;
 }
 
-const STANDARD_MARKUP = 0.10; // 10%
+const data = [
+  { name: 'Mon', jobs: 4, revenue: 2400 },
+  { name: 'Tue', jobs: 3, revenue: 1398 },
+  { name: 'Wed', jobs: 9, revenue: 9800 },
+  { name: 'Thu', jobs: 2, revenue: 3908 },
+  { name: 'Fri', jobs: 6, revenue: 4800 },
+  { name: 'Sat', jobs: 2, revenue: 3800 },
+  { name: 'Sun', jobs: 1, revenue: 4300 },
+];
 
-const StatCard = ({ title, value, icon: Icon, color, subtext }: { title: string, value: string, icon: any, color: string, subtext?: string }) => (
-  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center">
-    <div className={`p-4 rounded-full ${color} bg-opacity-10 mr-4`}>
-      <Icon className={color.replace('bg-', 'text-')} size={24} />
+const VEHICLE_OPTIONS = ['Flatbed', 'Tautliner', 'Rigid', 'Refrigerated', 'Superlink', 'Pantech', 'Tipper', '8 Ton', '1 Ton'];
+const CARGO_OPTIONS: CargoType[] = ['Palletised', 'Loose', 'Refrigerated', 'Hazardous', 'Abnormal', 'Container'];
+
+const StatCard = ({ title, value, icon: Icon, color, subtitle }: { title: string, value: string | number, icon: any, color: string, subtitle?: string }) => (
+  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center relative overflow-hidden">
+    <div className={`p-4 rounded-xl ${color} bg-opacity-10 mr-4 text-${color.split('-')[1]}-600`}>
+      <Icon size={24} />
     </div>
-    <div>
-      <p className="text-sm text-slate-500 font-medium">{title}</p>
-      <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
-      {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
+    <div className="flex-1">
+      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">{title}</p>
+      <h3 className="text-2xl font-black text-slate-800">{value}</h3>
+      {subtitle && <p className="text-[10px] text-slate-400 mt-1">{subtitle}</p>}
     </div>
   </div>
 );
 
-export const Dashboard: React.FC<DashboardProps> = ({ 
+const Dashboard: React.FC<DashboardProps> = ({ 
   role, 
   verificationStatus, 
   isPosting, 
   listings = [], 
-  bookings = [],
   notifications = [],
   quoteRequests = [],
-  quoteOffers = [],
-  preferredLanes = [],
+  wallet = { escrow: 0, available: 0 },
+  onPayout,
   onPostListing,
   onUpdateListing,
   onDeleteListing,
   onRequestQuote,
-  onUpdateLanes,
-  onBypassVerification
+  onCancelQuote
 }) => {
-  // Filter listings for the current carrier (mock ID 'c1' for demo)
   const myListings = listings.filter(l => l.carrierId === 'c1');
-  const myCarrierBookings = bookings.filter(b => b.carrierId === 'c1');
-  
-  // Filter for current shipper (mock ID 's1')
-  const myShipperBookings = bookings.filter(b => b.shipperId === 's1');
-  const activeShipments = myShipperBookings.filter(b => b.status !== 'Completed' && b.status !== 'Delivered');
-  
-  // Carrier Stats
-  const activeJobs = myCarrierBookings.filter(b => b.status !== 'Completed' && b.status !== 'Delivered');
-  const totalRevenue = myCarrierBookings.reduce((acc, b) => acc + (b.baseRate || 0), 0);
-
-  // Filter Notifications based on Role
-  const displayNotifications = notifications.filter(n => {
-     if (!n.audience || n.audience === 'all') return true;
-     return n.audience === role;
-  });
-
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
-  
-  // State to manage visibility of the Post/Edit form
-  const [showPostForm, setShowPostForm] = useState(isPosting || false);
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
 
-  // Shipper Quote Form State
-  const [showQuoteForm, setShowQuoteForm] = useState(false);
-  const [quoteForm, setQuoteForm] = useState({
-    origin: '',
-    destination: '',
-    date: '',
-    vehicleType: VEHICLE_OPTIONS[0],
-    serviceCategory: SERVICE_CATEGORIES[2],
-    serviceType: 'Door-to-Door',
-    cargoType: '',
-    weight: ''
-  });
-
-  // Carrier Preferences State
-  const [newLane, setNewLane] = useState({ origin: '', destination: '' });
-
-  // Carrier Post Load Form
   const [postForm, setPostForm] = useState({
     origin: '',
     destination: '',
     date: '',
-    collectionWindow: '', 
-    deliveryWindow: '',
-    transitTime: '',   
-    vehicleSelect: VEHICLE_OPTIONS[0],
-    vehicleCustom: '',
-    serviceCategory: SERVICE_CATEGORIES[2], // Default to Linehaul
+    vehicleType: 'Flatbed',
+    cargoType: 'Palletised' as CargoType,
     serviceType: 'Door-to-Door' as 'Door-to-Door' | 'Depot-to-Depot',
     availabilityType: 'Full' as 'Full' | 'Shared Space',
     spaceDetails: '',
-    availableTons: '',
-    availablePallets: '',
-    includesLoadingAssist: false,
-    gitCover: false,
-    gitLimit: '',
-    baseRate: ''
+    tons: '',
+    pallets: '',
+    baseRate: '',
+    driverAssistance: false
   });
 
-  const handleEditListing = (listing: Listing) => {
-    setEditingId(listing.id);
-    // Pre-fill form with existing data
-    setPostForm({
-      origin: listing.origin,
-      destination: listing.destination,
-      date: listing.date,
-      collectionWindow: listing.collectionWindow || '',
-      deliveryWindow: listing.deliveryWindow || '',
-      transitTime: listing.transitTime || '',
-      vehicleSelect: VEHICLE_OPTIONS.includes(listing.vehicleType) ? listing.vehicleType : 'Other',
-      vehicleCustom: VEHICLE_OPTIONS.includes(listing.vehicleType) ? '' : listing.vehicleType,
-      serviceCategory: listing.serviceCategory,
-      serviceType: listing.serviceType,
-      availabilityType: listing.availableDetails ? 'Shared Space' : 'Full',
-      spaceDetails: listing.availableDetails || '',
-      availableTons: listing.availableTons.toString(),
-      availablePallets: listing.availablePallets.toString(),
-      includesLoadingAssist: listing.includesLoadingAssist,
-      gitCover: listing.gitCover,
-      gitLimit: listing.gitLimit?.toString() || '',
-      baseRate: listing.baseRate.toString()
-    });
-    setShowPostForm(true);
-    // Ensure the form is visible
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  // Fixed missing quoteForm state
+  const [quoteForm, setQuoteForm] = useState({
+    origin: '',
+    destination: '',
+    date: '',
+    cargoDescription: '',
+    weightTons: '',
+    pallets: ''
+  });
 
   const handlePostSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!onPostListing) return;
-    
-    const finalVehicleType = postForm.vehicleSelect === 'Other' 
-      ? postForm.vehicleCustom 
-      : postForm.vehicleSelect;
+    const carrierRate = parseFloat(postForm.baseRate);
+    const marketPrice = carrierRate * 1.15; // 15% Platform Markup
 
-    // Markup Logic: Add 10% to the carrier's base rate
-    const carrierRate = parseFloat(postForm.baseRate) || 0;
-    const markup = STANDARD_MARKUP;
-    const marketPrice = carrierRate * (1 + markup);
-
-    // Common fields
-    const listingData = {
+    const listingData: Listing = {
+      id: editingId || Math.random().toString(36).substr(2, 9),
+      carrierId: 'c1',
+      carrierName: 'Swift Logistics',
       origin: postForm.origin,
       destination: postForm.destination,
       date: postForm.date,
-      collectionWindow: postForm.collectionWindow,
-      deliveryWindow: postForm.deliveryWindow,
-      transitTime: postForm.transitTime,
-      vehicleType: finalVehicleType,
-      serviceCategory: postForm.serviceCategory,
+      vehicleType: postForm.vehicleType,
+      cargoType: postForm.cargoType,
       serviceType: postForm.serviceType,
-      availableTons: parseFloat(postForm.availableTons) || 0,
-      availablePallets: parseFloat(postForm.availablePallets) || 0,
+      availableTons: Number(postForm.tons) || 0,
+      availablePallets: Number(postForm.pallets) || 0,
       availableDetails: postForm.availabilityType === 'Shared Space' ? postForm.spaceDetails : undefined,
-      includesLoadingAssist: postForm.includesLoadingAssist,
-      gitCover: postForm.gitCover,
-      gitLimit: postForm.gitCover ? (parseFloat(postForm.gitLimit) || 0) : undefined,
       baseRate: carrierRate,
-      price: marketPrice
+      price: marketPrice,
+      isBooked: false,
+      driverAssistance: postForm.driverAssistance
     };
 
     if (editingId && onUpdateListing) {
-      // Update existing listing
-      const existing = listings.find(l => l.id === editingId);
-      if (existing) {
-        const updatedListing = {
-          ...existing,
-          ...listingData
-        };
-        onUpdateListing(updatedListing);
-      }
+      onUpdateListing(listingData);
       setEditingId(null);
     } else {
-      // Create new listing
-      const newRoute: Listing = {
-        id: Math.random().toString(36).substr(2, 9),
-        carrierId: 'c1', // Mock ID
-        carrierName: 'Swift Logistics', // Mock Name
-        isBooked: false,
-        ...listingData
-      };
-      onPostListing(newRoute);
+      onPostListing(listingData);
     }
 
-    // Reset Form
-    setPostForm({
-      origin: '',
-      destination: '',
-      date: '',
-      collectionWindow: '',
-      deliveryWindow: '',
-      transitTime: '',
-      vehicleSelect: VEHICLE_OPTIONS[0],
-      vehicleCustom: '',
-      serviceCategory: SERVICE_CATEGORIES[2],
-      serviceType: 'Door-to-Door',
-      availabilityType: 'Full',
-      spaceDetails: '',
-      availableTons: '',
-      availablePallets: '',
-      includesLoadingAssist: false,
-      gitCover: false,
-      gitLimit: '',
-      baseRate: ''
-    });
-    setShowPostForm(false);
+    setPostForm({ origin: '', destination: '', date: '', vehicleType: 'Flatbed', cargoType: 'Palletised', serviceType: 'Door-to-Door', availabilityType: 'Full', spaceDetails: '', tons: '', pallets: '', baseRate: '', driverAssistance: false });
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
+  // Fixed missing handleQuoteSubmit handler
   const handleQuoteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onRequestQuote) {
-      onRequestQuote({
-        ...quoteForm,
-        weight: parseFloat(quoteForm.weight) || 0,
-      });
-      
-      setShowQuoteForm(false);
-      setQuoteForm({
-        origin: '',
-        destination: '',
-        date: '',
-        vehicleType: VEHICLE_OPTIONS[0],
-        serviceCategory: SERVICE_CATEGORIES[2],
-        serviceType: 'Door-to-Door',
-        cargoType: '',
-        weight: ''
-      });
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
-    }
+    if (!onRequestQuote) return;
+    onRequestQuote(quoteForm);
+    setQuoteForm({ origin: '', destination: '', date: '', cargoDescription: '', weightTons: '', pallets: '' });
+    setIsQuoteModalOpen(false);
+    alert("Quote request successfully broadcasted to carriers.");
+  };
+
+  const handleEdit = (route: Listing) => {
+    setPostForm({
+      origin: route.origin,
+      destination: route.destination,
+      date: route.date,
+      vehicleType: route.vehicleType,
+      cargoType: route.cargoType || 'Palletised',
+      serviceType: route.serviceType,
+      availabilityType: route.availableDetails ? 'Shared Space' : 'Full',
+      spaceDetails: route.availableDetails || '',
+      tons: route.availableTons.toString(),
+      pallets: route.availablePallets.toString(),
+      baseRate: route.baseRate.toString(),
+      driverAssistance: route.driverAssistance || false
+    });
+    setEditingId(route.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (role === 'carrier') {
-    return (
-      <div className="space-y-6">
-        {/* Verification Banner */}
-        {verificationStatus !== 'verified' && (
-          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg flex justify-between items-center">
-             <div>
-                <h4 className="font-bold text-amber-800">Account Verification Required</h4>
-                <p className="text-sm text-amber-700">Complete your profile to start accepting higher value loads.</p>
-             </div>
-             {onBypassVerification && (
-               <button onClick={onBypassVerification} className="text-xs bg-amber-200 text-amber-800 px-2 py-1 rounded hover:bg-amber-300">
-                  Demo: Bypass
-               </button>
-             )}
+    if (verificationStatus !== 'verified') {
+       return (
+         <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-xl max-w-2xl mx-auto mt-10">
+           <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+             <ShieldCheck className="text-amber-500" size={40} />
+           </div>
+           <h2 className="text-2xl font-black text-slate-800 mb-2">Account Verification Pending</h2>
+           <p className="text-slate-500 mb-8">Our admin team is reviewing your documents. Once approved, you can start posting loads and accepting bookings.</p>
+           <button className="bg-slate-100 text-slate-600 px-6 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all">Check Documentation</button>
+         </div>
+       );
+    }
+
+    if (isPosting) {
+      return (
+        <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight">
+                {editingId ? 'Edit Route' : 'Post Empty Leg'}
+              </h2>
+              <p className="text-slate-500">Sell your unused truck space to local shippers.</p>
+            </div>
+            <button onClick={() => window.history.back()} className="text-slate-400 hover:text-slate-600 font-medium">Cancel</button>
           </div>
-        )}
 
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">Carrier Dashboard</h2>
-          <button 
-            onClick={() => { setShowPostForm(!showPostForm); setEditingId(null); }}
-            className="bg-brand-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-800 shadow-md transition-all"
-          >
-            {showPostForm ? <X size={20} /> : <PlusCircle size={20} />}
-            {showPostForm ? 'Cancel Posting' : 'Post Empty Leg'}
-          </button>
-        </div>
+          {showSuccess && (
+             <div className="bg-emerald-500 text-white p-4 rounded-2xl mb-8 flex items-center shadow-lg shadow-emerald-500/20 border border-emerald-400 animate-in zoom-in">
+               <CheckCircle className="mr-3" size={24} /> 
+               <span className="font-bold">Listing Live!</span> It is now visible to all shippers in the marketplace.
+             </div>
+          )}
 
-        {/* Post Load Form */}
-        {showPostForm && (
-          <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 animate-in fade-in slide-in-from-top-4">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">{editingId ? 'Edit Listing' : 'Post New Empty Leg'}</h3>
-            <form onSubmit={handlePostSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <CitySearchInput 
-                    label="Origin City"
-                    value={postForm.origin}
-                    onChange={(val) => setPostForm({...postForm, origin: val})}
-                    placeholder="e.g. Johannesburg"
-                    className="z-30"
-                    required
-                 />
-                 <CitySearchInput 
-                    label="Destination City"
-                    value={postForm.destination}
-                    onChange={(val) => setPostForm({...postForm, destination: val})}
-                    placeholder="e.g. Cape Town"
-                    className="z-20"
-                    required
-                 />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Date</label>
-                    <input 
-                      type="date" 
-                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      value={postForm.date}
-                      onChange={(e) => setPostForm({...postForm, date: e.target.value})}
-                      required
-                    />
-                 </div>
-                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">Collection Window</label>
-                     <input 
-                       type="text" 
-                       placeholder="e.g. 08:00 - 12:00"
-                       className="w-full p-2 border border-slate-300 rounded-lg"
-                       value={postForm.collectionWindow}
-                       onChange={(e) => setPostForm({...postForm, collectionWindow: e.target.value})}
-                     />
-                 </div>
-                 <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">Delivery Window</label>
-                     <input 
-                       type="text" 
-                       placeholder="e.g. 14:00 - 17:00"
-                       className="w-full p-2 border border-slate-300 rounded-lg"
-                       value={postForm.deliveryWindow}
-                       onChange={(e) => setPostForm({...postForm, deliveryWindow: e.target.value})}
-                     />
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Vehicle Type</label>
-                      <select 
-                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                        value={postForm.vehicleSelect}
-                        onChange={(e) => setPostForm({...postForm, vehicleSelect: e.target.value})}
-                      >
-                         {VEHICLE_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
-                      </select>
-                  </div>
-                  {postForm.vehicleSelect === 'Other' && (
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Specify Vehicle</label>
-                        <input 
-                          type="text"
-                          placeholder="e.g. Flatbed Trailer"
-                          className="w-full p-2 border border-slate-300 rounded-lg"
-                          value={postForm.vehicleCustom}
-                          onChange={(e) => setPostForm({...postForm, vehicleCustom: e.target.value})}
-                          required
-                        />
-                    </div>
-                  )}
-                  <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Service Category</label>
-                      <select 
-                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                        value={postForm.serviceCategory}
-                        onChange={(e) => setPostForm({...postForm, serviceCategory: e.target.value})}
-                      >
-                         {SERVICE_CATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                  </div>
-              </div>
-
-              {/* Load Availability Selector */}
-              <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Load Type</label>
-                  <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                      <label className={`flex-1 border-2 rounded-xl p-3 cursor-pointer transition-all flex items-center gap-3 ${postForm.availabilityType === 'Full' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                          <input 
-                              type="radio" 
-                              name="availabilityType" 
-                              value="Full" 
-                              checked={postForm.availabilityType === 'Full'} 
-                              onChange={() => setPostForm({...postForm, availabilityType: 'Full'})}
-                              className="hidden"
-                          />
-                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${postForm.availabilityType === 'Full' ? 'border-emerald-500 bg-white' : 'border-slate-300'}`}>
-                              {postForm.availabilityType === 'Full' && <div className="w-3 h-3 rounded-full bg-emerald-500"></div>}
-                          </div>
-                          <div>
-                             <div className="flex items-center gap-2 font-bold">
-                                 <Truck size={18} /> Full Truck Load
-                             </div>
-                             <div className="text-xs opacity-80">Entire vehicle capacity</div>
-                          </div>
-                      </label>
-
-                      <label className={`flex-1 border-2 rounded-xl p-3 cursor-pointer transition-all flex items-center gap-3 ${postForm.availabilityType === 'Shared Space' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                          <input 
-                              type="radio" 
-                              name="availabilityType" 
-                              value="Shared Space" 
-                              checked={postForm.availabilityType === 'Shared Space'} 
-                              onChange={() => setPostForm({...postForm, availabilityType: 'Shared Space'})}
-                              className="hidden"
-                          />
-                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${postForm.availabilityType === 'Shared Space' ? 'border-emerald-500 bg-white' : 'border-slate-300'}`}>
-                              {postForm.availabilityType === 'Shared Space' && <div className="w-3 h-3 rounded-full bg-emerald-500"></div>}
-                          </div>
-                          <div>
-                             <div className="flex items-center gap-2 font-bold">
-                                 <Box size={18} /> Shared Space / Co-load
-                             </div>
-                             <div className="text-xs opacity-80">Specific pallet spots or meters</div>
-                          </div>
-                      </label>
-                  </div>
-
-                  {postForm.availabilityType === 'Shared Space' && (
-                      <div className="mb-4 animate-in fade-in slide-in-from-top-2">
-                          <label className="block text-sm font-bold text-slate-700 mb-1">Space Description</label>
-                          <input 
-                              type="text" 
-                              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                              placeholder="e.g. 6 Pallet spots available, 3m deck space, or 5 tons only"
-                              value={postForm.spaceDetails}
-                              onChange={(e) => setPostForm({...postForm, spaceDetails: e.target.value})}
-                          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+               <div className="bg-white rounded-3xl shadow-sm border p-8 space-y-8">
+                  <form onSubmit={handlePostSubmit} className="space-y-8">
+                    <section className="space-y-6">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-brand-500">1. Route & Schedule</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <CitySearchInput label="Origin City" value={postForm.origin} onChange={(val) => setPostForm(prev => ({...prev, origin: val}))} placeholder="Pickup Location" required={true} />
+                        <CitySearchInput label="Destination City" value={postForm.destination} onChange={(val) => setPostForm(prev => ({...prev, destination: val}))} placeholder="Drop-off Location" required={true} />
                       </div>
-                  )}
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <h4 className="font-bold text-slate-800 mb-3 text-sm">Capacity & Extras</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1">Avail. Tons</label>
-                          <input type="number" className="w-full p-2 border border-slate-300 rounded" placeholder="0" value={postForm.availableTons} onChange={e => setPostForm({...postForm, availableTons: e.target.value})} />
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1">Avail. Pallets</label>
-                          <input type="number" className="w-full p-2 border border-slate-300 rounded" placeholder="0" value={postForm.availablePallets} onChange={e => setPostForm({...postForm, availablePallets: e.target.value})} />
-                      </div>
-                      <div className="col-span-2">
-                          <label className="block text-xs font-bold text-slate-500 mb-1">Base Rate (Your Earnings)</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Available Date</label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">R</span>
-                            <input type="number" className="w-full pl-8 p-2 border border-slate-300 rounded font-bold text-emerald-600" placeholder="0.00" value={postForm.baseRate} onChange={e => setPostForm({...postForm, baseRate: e.target.value})} required />
+                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input type="date" className="w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" value={postForm.date} onChange={(e) => setPostForm({...postForm, date: e.target.value})} required />
                           </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Service Type</label>
+                          <select className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" value={postForm.serviceType} onChange={(e) => setPostForm({...postForm, serviceType: e.target.value as any})}>
+                            <option value="Door-to-Door">Door-to-Door (Collect & Deliver)</option>
+                            <option value="Depot-to-Depot">Depot-to-Depot (Hub-to-Hub)</option>
+                          </select>
+                        </div>
                       </div>
-                  </div>
-                  <div className="flex gap-6">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={postForm.includesLoadingAssist} onChange={e => setPostForm({...postForm, includesLoadingAssist: e.target.checked})} className="rounded text-emerald-600 focus:ring-emerald-500" />
-                          <span className="text-sm text-slate-700">Driver Assists Loading</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={postForm.gitCover} onChange={e => setPostForm({...postForm, gitCover: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500" />
-                          <span className="text-sm text-slate-700">GIT Insurance Included</span>
-                      </label>
-                  </div>
-                  {postForm.gitCover && (
-                      <div className="mt-3 animate-in fade-in slide-in-from-top-2">
-                          <label className="block text-xs font-bold text-slate-500 mb-1">GIT Limit (ZAR)</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-2 border border-slate-300 rounded max-w-xs" 
-                            placeholder="e.g. 1000000"
-                            value={postForm.gitLimit}
-                            onChange={e => setPostForm({...postForm, gitLimit: e.target.value})}
-                          />
+                    </section>
+
+                    <section className="space-y-6 border-t pt-8">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-brand-500">2. Vehicle & Capacity</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Truck Configuration</label>
+                          <select className="w-full px-4 py-3 border rounded-xl" value={postForm.vehicleType} onChange={(e) => setPostForm({...postForm, vehicleType: e.target.value})}>
+                            {VEHICLE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cargo Compatibility</label>
+                          <select className="w-full px-4 py-3 border rounded-xl" value={postForm.cargoType} onChange={(e) => setPostForm({...postForm, cargoType: e.target.value as CargoType})}>
+                            {CARGO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        </div>
                       </div>
-                  )}
+
+                      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                        <label className="block text-sm font-bold text-slate-700 mb-4">Space Utilization</label>
+                        <div className="flex gap-4 mb-4">
+                          <button type="button" onClick={() => setPostForm({...postForm, availabilityType: 'Full'})} className={`flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all ${postForm.availabilityType === 'Full' ? 'border-emerald-500 bg-white text-emerald-600 shadow-sm' : 'border-transparent bg-slate-200 text-slate-500'}`}>Full Truck</button>
+                          <button type="button" onClick={() => setPostForm({...postForm, availabilityType: 'Shared Space'})} className={`flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all ${postForm.availabilityType === 'Shared Space' ? 'border-emerald-500 bg-white text-emerald-600 shadow-sm' : 'border-transparent bg-slate-200 text-slate-500'}`}>Shared Space</button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                           <div>
+                             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Max Weight (Tons)</label>
+                             <input type="number" placeholder="e.g. 15" className="w-full px-4 py-2 border rounded-lg" value={postForm.tons} onChange={(e) => setPostForm({...postForm, tons: e.target.value})} />
+                           </div>
+                           <div>
+                             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Max Pallets</label>
+                             <input type="number" placeholder="e.g. 10" className="w-full px-4 py-2 border rounded-lg" value={postForm.pallets} onChange={(e) => setPostForm({...postForm, pallets: e.target.value})} />
+                           </div>
+                        </div>
+                        {postForm.availabilityType === 'Shared Space' && (
+                          <div className="mt-4 animate-in slide-in-from-top-2">
+                             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Space Description</label>
+                             <input type="text" placeholder="e.g. Left-side deck space, tail-gate access only..." className="w-full px-4 py-2 border rounded-lg" value={postForm.spaceDetails} onChange={(e) => setPostForm({...postForm, spaceDetails: e.target.value})} />
+                          </div>
+                        )}
+                      </div>
+
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${postForm.driverAssistance ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 group-hover:border-emerald-500'}`}>
+                           {postForm.driverAssistance && <CheckCircle size={14} className="text-white" />}
+                           <input type="checkbox" className="hidden" checked={postForm.driverAssistance} onChange={() => setPostForm({...postForm, driverAssistance: !postForm.driverAssistance})} />
+                        </div>
+                        <span className="text-sm font-medium text-slate-700">Driver will assist with loading/offloading</span>
+                      </label>
+                    </section>
+
+                    <section className="space-y-6 border-t pt-8">
+                       <h3 className="text-xs font-black uppercase tracking-widest text-brand-500">3. Pricing</h3>
+                       <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Net Rate (Your Earnings)</label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400">R</span>
+                            <input type="number" className="w-full pl-10 pr-4 py-4 border rounded-2xl text-xl font-black focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0.00" value={postForm.baseRate} onChange={(e) => setPostForm({...postForm, baseRate: e.target.value})} required />
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-2 font-medium italic">FreightConnect will apply a 15% marketplace markup to this rate for the shipper.</p>
+                       </div>
+                    </section>
+
+                    <button type="submit" className="w-full py-5 bg-brand-900 text-white rounded-2xl font-black text-lg hover:bg-brand-800 shadow-xl shadow-brand-900/20 transition-all active:scale-95">
+                      {editingId ? 'Save Changes' : 'Go Live Now'}
+                    </button>
+                  </form>
+               </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-brand-900 text-white p-6 rounded-3xl shadow-xl">
+                 <h4 className="font-bold mb-4 flex items-center gap-2">
+                   <Info size={18} className="text-emerald-400" />
+                   Pricing Estimate
+                 </h4>
+                 <div className="space-y-3">
+                   <div className="flex justify-between text-sm opacity-70">
+                     <span>Your Earnings:</span>
+                     <span>R {Number(postForm.baseRate).toLocaleString() || '0'}</span>
+                   </div>
+                   <div className="flex justify-between text-sm opacity-70">
+                     <span>Platform Markup:</span>
+                     <span>R {(Number(postForm.baseRate) * 0.15).toLocaleString() || '0'}</span>
+                   </div>
+                   <div className="pt-3 border-t border-brand-800 flex justify-between font-black text-lg">
+                     <span className="text-emerald-400">Total Shipper Price:</span>
+                     <span>R {(Number(postForm.baseRate) * 1.15).toLocaleString() || '0'}</span>
+                   </div>
+                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
-                  <button 
-                    type="button" 
-                    onClick={() => { setShowPostForm(false); setEditingId(null); }}
-                    className="px-6 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="px-6 py-2 bg-brand-900 text-white font-bold rounded-lg hover:bg-brand-800 shadow-lg"
-                  >
-                    {editingId ? 'Update Listing' : 'Post Listing'}
-                  </button>
+              <div className="bg-white p-6 rounded-3xl border border-slate-200">
+                <h4 className="font-bold text-slate-800 mb-4">Current Fleet Status</h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
+                    <span className="text-xs font-bold text-slate-500">Superlinks Active</span>
+                    <span className="font-black text-slate-800">2</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
+                    <span className="text-xs font-bold text-slate-500">8 Tonners Available</span>
+                    <span className="font-black text-slate-800">4</span>
+                  </div>
+                </div>
               </div>
-            </form>
+            </div>
           </div>
-        )}
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <StatCard title="Active Jobs" value={activeJobs.length.toString()} icon={Truck} color="bg-blue-500" />
-          <StatCard title="Total Revenue" value={`R ${totalRevenue.toLocaleString()}`} icon={Banknote} color="bg-emerald-500" />
-          <StatCard title="My Listings" value={myListings.length.toString()} icon={Box} color="bg-indigo-500" />
-          <StatCard title="Platform Rating" value="4.8" icon={Activity} color="bg-amber-500" subtext="Top 10% of carriers" />
+          <div className="mt-12">
+             <h3 className="text-xl font-black text-slate-800 mb-6">Active Marketplace Listings</h3>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               {myListings.length === 0 ? (
+                 <div className="col-span-2 p-12 bg-white rounded-3xl border-2 border-dashed border-slate-200 text-center text-slate-400">
+                    No active listings. Post an empty leg to start earning.
+                 </div>
+               ) : (
+                 myListings.map(listing => (
+                   <div key={listing.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-emerald-500 transition-all">
+                      <div className="flex justify-between items-start mb-4">
+                         <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-tighter mb-1">{listing.date}</p>
+                            <h4 className="font-black text-slate-800 text-lg">{listing.origin} → {listing.destination}</h4>
+                         </div>
+                         <div className="text-right">
+                           <p className="font-black text-emerald-600">R {listing.baseRate.toLocaleString()}</p>
+                           <p className="text-[9px] text-slate-400 uppercase">Your Net</p>
+                         </div>
+                      </div>
+                      <div className="flex gap-2 mb-6">
+                         <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-full font-bold">{listing.vehicleType}</span>
+                         <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-full font-bold">{listing.cargoType}</span>
+                         {listing.availableDetails && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Shared</span>}
+                      </div>
+                      <div className="flex gap-2 pt-4 border-t border-slate-50">
+                        <button onClick={() => handleEdit(listing)} className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 flex items-center justify-center gap-2"><Edit2 size={12}/> Edit</button>
+                        <button onClick={() => onDeleteListing?.(listing.id)} className="flex-1 py-2 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-2"><Trash2 size={12}/> Delete</button>
+                      </div>
+                   </div>
+                 ))
+               )}
+             </div>
+          </div>
         </div>
+      );
+    }
 
-        {/* Listings Management */}
-        <div>
-           <h3 className="text-lg font-bold text-slate-800 mb-4">My Active Listings</h3>
-           {myListings.length === 0 ? (
-             <div className="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center">
-                <p className="text-slate-500 mb-4">You haven't posted any empty legs yet.</p>
-                <button onClick={() => setShowPostForm(true)} className="text-emerald-600 font-bold hover:underline">Post your first load</button>
-             </div>
-           ) : (
-             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-6 py-4 font-semibold text-slate-600">Route</th>
-                      <th className="px-6 py-4 font-semibold text-slate-600">Date</th>
-                      <th className="px-6 py-4 font-semibold text-slate-600">Vehicle</th>
-                      <th className="px-6 py-4 font-semibold text-slate-600">Price</th>
-                      <th className="px-6 py-4 font-semibold text-slate-600 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {myListings.map(listing => (
-                      <tr key={listing.id} className="hover:bg-slate-50">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-slate-800">{listing.origin} <span className="text-slate-400">→</span> {listing.destination}</div>
-                          <div className="text-xs text-slate-400">{listing.serviceType}</div>
-                        </td>
-                        <td className="px-6 py-4">{listing.date}</td>
-                        <td className="px-6 py-4">
-                           <div className="text-slate-800">{listing.vehicleType}</div>
-                           <div className="text-xs text-slate-500">{listing.availableTons}T / {listing.availablePallets} plts</div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-emerald-600">R {listing.price.toLocaleString()}</td>
-                        <td className="px-6 py-4 text-right flex justify-end gap-2">
-                           <button onClick={() => handleEditListing(listing)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded"><Edit2 size={16} /></button>
-                           <button onClick={() => onDeleteListing && onDeleteListing(listing.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
-                        </td>
-                      </tr>
+    return (
+      <div className="space-y-10 animate-in fade-in duration-700">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">Carrier Command Center</h2>
+            <p className="text-slate-500 font-medium">Monitoring fleet operations for <span className="text-brand-600 font-bold">Swift Logistics</span></p>
+          </div>
+          <div className="flex gap-3">
+             <button className="px-4 py-3 bg-white border border-slate-200 rounded-2xl text-slate-600 font-bold hover:bg-slate-50 flex items-center gap-2 shadow-sm"><Download size={18}/> Export Report</button>
+             <button onClick={() => onPayout?.()} className="px-6 py-3 bg-brand-900 text-white rounded-2xl font-black hover:bg-brand-800 flex items-center gap-2 shadow-xl shadow-brand-900/20 active:scale-95 transition-all"><Wallet size={18} className="text-emerald-400"/> Payout</button>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard title="Funds in Escrow" value={`R ${wallet.escrow.toLocaleString()}`} icon={ShieldCheck} color="bg-indigo-500" subtitle="Pending Delivery Proof" />
+          <StatCard title="Available to Withdraw" value={`R ${wallet.available.toLocaleString()}`} icon={Banknote} color="bg-emerald-500" subtitle="Verified PODs" />
+          <StatCard title="Active Jobs" value="3" icon={Truck} color="bg-blue-500" subtitle="In-transit tracking" />
+          <StatCard title="New Leads" value={quoteRequests.length} icon={Users} color="bg-purple-500" subtitle="Marketplace Requests" />
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+           <div className="lg:col-span-2 space-y-8">
+              {quoteRequests.length > 0 && (
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
+                  <div className="bg-slate-900 p-6 flex justify-between items-center">
+                    <h3 className="text-white font-black tracking-wider text-sm flex items-center gap-2">
+                      <ArrowRightLeft size={18} className="text-emerald-400" />
+                      NEW MARKETPLACE LEADS
+                    </h3>
+                    <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">ACTIVE NOW</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {quoteRequests.map(q => (
+                      <div key={q.id} className="p-6 hover:bg-slate-50 transition-all group flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                             <h4 className="font-black text-slate-800">{q.origin} → {q.destination}</h4>
+                             <span className="bg-blue-100 text-blue-700 text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase">{q.pallets} Pallets</span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium">Pickup: <span className="font-bold text-slate-700">{q.date}</span> • {q.cargoDescription || 'General Cargo'}</p>
+                        </div>
+                        <button className="bg-brand-900 text-white px-5 py-2 rounded-xl text-xs font-black hover:bg-brand-800 shadow-md group-hover:scale-105 transition-all">Submit Quote</button>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-             </div>
-           )}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                <div className="flex justify-between items-center mb-8">
+                   <h3 className="font-black text-slate-800 tracking-tight">Financial Performance</h3>
+                   <select className="bg-slate-50 border-none text-xs font-bold text-slate-500 rounded-lg px-3 py-1.5">
+                      <option>Last 7 Days</option>
+                      <option>Last 30 Days</option>
+                   </select>
+                </div>
+                <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={data}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 'bold'}} dy={10}/><YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 'bold'}} /><Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'}} /><Bar dataKey="revenue" fill="#0c4a6e" radius={[10, 10, 0, 0]} barSize={32} /></BarChart></ResponsiveContainer></div>
+              </div>
+           </div>
+
+           <div className="space-y-6">
+              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <h4 className="font-black text-slate-800 mb-6 flex items-center gap-2">
+                   <Activity size={18} className="text-blue-500" />
+                   LIVE OPERATION FEED
+                </h4>
+                <div className="space-y-6">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex gap-4 relative">
+                      {i < 3 && <div className="absolute left-5 top-10 bottom-0 w-0.5 bg-slate-100"></div>}
+                      <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center flex-shrink-0 border border-slate-100 text-slate-400">
+                         {i === 1 ? <CheckCircle size={20} className="text-emerald-500" /> : <Clock size={20} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <p className="text-sm font-bold text-slate-800 truncate">Job #B-22{i} {i === 1 ? 'Delivered' : 'In-Transit'}</p>
+                         <p className="text-[10px] text-slate-500 font-medium mt-0.5">JHB to Durban • Driver: M. Nkosi</p>
+                         <p className="text-[9px] text-slate-400 mt-2 font-bold uppercase tracking-wider">{i}0 mins ago</p>
+                      </div>
+                      <ChevronRight size={16} className="text-slate-300 mt-3" />
+                    </div>
+                  ))}
+                </div>
+                <button className="w-full mt-8 py-3 bg-slate-50 text-slate-600 rounded-xl text-xs font-black hover:bg-slate-100 transition-all">View All Activity</button>
+              </div>
+
+              <div className="bg-emerald-500 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl shadow-emerald-500/20">
+                 <div className="relative z-10">
+                    <p className="text-xs font-black uppercase tracking-widest opacity-80 mb-2">Carrier Rep Score</p>
+                    <h3 className="text-5xl font-black mb-4">4.8<span className="text-2xl opacity-60">/5</span></h3>
+                    <div className="flex items-center gap-2 text-xs font-bold bg-white/20 w-fit px-3 py-1 rounded-full mb-6">
+                       <CheckCircle size={14} /> Top Rated Carrier
+                    </div>
+                    <p className="text-sm opacity-90 leading-relaxed font-medium">Your account performance is exceptional. You qualify for <span className="underline">Early Payouts</span>.</p>
+                 </div>
+                 <Activity size={100} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+              </div>
+           </div>
         </div>
       </div>
     );
   }
 
-  // Shipper View
+  // Shipper Dashboard Logic
   return (
-    <div className="space-y-6">
-       <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">Shipper Dashboard</h2>
-          <button 
-             onClick={() => setShowQuoteForm(!showQuoteForm)}
-             className="bg-brand-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-800 shadow-md transition-all"
-          >
-             {showQuoteForm ? <X size={20} /> : <PlusCircle size={20} />}
-             {showQuoteForm ? 'Cancel' : 'Request Quote'}
+    <div className="space-y-10">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">Shipper Dashboard</h2>
+            <p className="text-slate-500">Manage your supply chain and active cargo movement.</p>
+          </div>
+          <button onClick={() => setIsQuoteModalOpen(true)} className="bg-brand-900 text-white px-8 py-3 rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-brand-900/20 active:scale-95 transition-all">
+             <PlusCircle size={20} /> Request Quote
           </button>
-       </div>
+        </div>
 
-       {/* Quote Request Form */}
-       {showQuoteForm && (
-         <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 animate-in fade-in slide-in-from-top-4 mb-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Request Transport Quote</h3>
-            <p className="text-sm text-slate-500 mb-4">Fill in the details to get competitive quotes from our carrier network.</p>
-            <form onSubmit={handleQuoteSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <CitySearchInput 
-                    label="Origin City"
-                    value={quoteForm.origin}
-                    onChange={(val) => setQuoteForm({...quoteForm, origin: val})}
-                    placeholder="e.g. Johannesburg"
-                    className="z-30"
-                    required
-                 />
-                 <CitySearchInput 
-                    label="Destination City"
-                    value={quoteForm.destination}
-                    onChange={(val) => setQuoteForm({...quoteForm, destination: val})}
-                    placeholder="e.g. Durban"
-                    className="z-20"
-                    required
-                 />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <StatCard title="Active Shipments" value="12" icon={Package} color="bg-indigo-500" />
+          <StatCard title="Pending Quotes" value={quoteRequests.length} icon={FileText} color="bg-amber-500" />
+          <StatCard title="Total Spend" value="R 125,400" icon={Banknote} color="bg-emerald-500" />
+        </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Ready Date</label>
-                    <input 
-                      type="date" 
-                      className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                      value={quoteForm.date}
-                      onChange={(e) => setQuoteForm({...quoteForm, date: e.target.value})}
-                      required
-                    />
-                 </div>
-                 <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Cargo Type</label>
-                      <input 
-                        type="text"
-                        placeholder="e.g. Pallets, Machinery"
-                        className="w-full p-2 border border-slate-300 rounded-lg"
-                        value={quoteForm.cargoType}
-                        onChange={(e) => setQuoteForm({...quoteForm, cargoType: e.target.value})}
-                        required
-                      />
-                 </div>
-                 <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Total Weight (Kg)</label>
-                      <input 
-                        type="number"
-                        placeholder="e.g. 5000"
-                        className="w-full p-2 border border-slate-300 rounded-lg"
-                        value={quoteForm.weight}
-                        onChange={(e) => setQuoteForm({...quoteForm, weight: e.target.value})}
-                        required
-                      />
-                 </div>
-              </div>
+        {quoteRequests.length > 0 && (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
+            <h3 className="p-6 font-black text-slate-800 border-b border-slate-50 tracking-tight flex items-center gap-2">
+              <Clock size={20} className="text-amber-500" />
+              ACTIVE QUOTE REQUESTS
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50">
+                  <tr className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">
+                    <th className="px-8 py-4">Lanes</th>
+                    <th className="px-8 py-4">Preferred Date</th>
+                    <th className="px-8 py-4">Status</th>
+                    <th className="px-8 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {quoteRequests.map(q => (
+                    <tr key={q.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-8 py-5 font-black text-slate-800">{q.origin} → {q.destination}</td>
+                      <td className="px-8 py-5 text-slate-500 font-medium">{q.date}</td>
+                      <td className="px-8 py-5">
+                        <span className="text-[10px] bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl font-black uppercase border border-amber-100">Awaiting Carrier Offers</span>
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                        <button onClick={() => onCancelQuote?.(q.id)} className="text-red-400 hover:text-red-600 p-2 transition-colors"><Trash size={20} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Required Vehicle</label>
-                      <select 
-                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                        value={quoteForm.vehicleType}
-                        onChange={(e) => setQuoteForm({...quoteForm, vehicleType: e.target.value})}
-                      >
-                         {VEHICLE_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
-                      </select>
+        <div>
+            <h3 className="text-xl font-black text-slate-800 mb-6 tracking-tight">Spot Market Insights (Recently Posted Trucks)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {listings.slice(0, 3).map(l => (
+                  <div key={l.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:border-emerald-500 transition-all flex flex-col justify-between">
+                     <div>
+                        <div className="flex justify-between items-start mb-4">
+                           <span className="bg-slate-100 text-slate-600 text-[10px] font-black uppercase px-2 py-1 rounded-lg">{l.vehicleType}</span>
+                           <span className="text-emerald-600 font-black">R {l.price.toLocaleString()}</span>
+                        </div>
+                        <h4 className="font-black text-slate-800 text-lg mb-1">{l.origin} → {l.destination}</h4>
+                        <p className="text-xs text-slate-500 font-bold mb-4">{l.date}</p>
+                     </div>
+                     <button className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-black hover:bg-slate-800 shadow-md">Instant Book</button>
                   </div>
-                  <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Service Category</label>
-                      <select 
-                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                        value={quoteForm.serviceCategory}
-                        onChange={(e) => setQuoteForm({...quoteForm, serviceCategory: e.target.value})}
-                      >
-                         {SERVICE_CATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                  </div>
-                   <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Service Type</label>
-                      <select 
-                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                        value={quoteForm.serviceType}
-                        onChange={(e) => setQuoteForm({...quoteForm, serviceType: e.target.value})}
-                      >
-                         <option value="Door-to-Door">Door-to-Door</option>
-                         <option value="Depot-to-Depot">Depot-to-Depot</option>
-                      </select>
-                  </div>
+               ))}
+            </div>
+        </div>
+
+        {isQuoteModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[100] p-4 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white rounded-[40px] w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="bg-brand-900 p-10 flex justify-between items-center text-white relative overflow-hidden">
+                 <div className="relative z-10">
+                   <h3 className="font-black text-3xl mb-2 tracking-tight">Request a Quote</h3>
+                   <p className="text-brand-300 text-sm font-medium">Broadcast your load requirements to our network of verified carriers.</p>
+                 </div>
+                 <button onClick={() => setIsQuoteModalOpen(false)} className="relative z-10 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-all">
+                   <X size={24} />
+                 </button>
+                 <Truck size={150} className="absolute -right-10 -bottom-10 opacity-5 -rotate-12" />
               </div>
-
-              <div className="flex justify-end pt-4">
-                  <button 
-                    type="submit" 
-                    className="px-8 py-3 bg-brand-900 text-white font-bold rounded-lg hover:bg-brand-800 shadow-lg flex items-center gap-2"
-                  >
-                    <Send size={18} /> Submit Request
-                  </button>
-              </div>
-            </form>
-         </div>
-       )}
-
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard title="Active Shipments" value={activeShipments.length.toString()} icon={Package} color="bg-blue-500" />
-          <StatCard title="Pending Quotes" value={quoteRequests.filter(q => q.status === 'Open').length.toString()} icon={FileText} color="bg-amber-500" />
-          <StatCard title="Total Spent" value="R 45,200" icon={Banknote} color="bg-emerald-500" />
-       </div>
-
-       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h3 className="font-bold text-slate-800 mb-4">Active Shipments</h3>
-          {activeShipments.length === 0 ? (
-             <p className="text-slate-500 italic">No active shipments in transit.</p>
-          ) : (
-             <div className="space-y-4">
-                {activeShipments.map(booking => (
-                   <div key={booking.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-lg bg-slate-50">
-                       <div className="flex items-center gap-4">
-                           <div className="p-3 bg-white rounded-full text-blue-600 shadow-sm">
-                              <Truck size={20} />
-                           </div>
-                           <div>
-                              <p className="font-bold text-slate-800">{booking.origin} → {booking.destination}</p>
-                              <p className="text-xs text-slate-500">Carrier: {booking.carrierName} • WB: {booking.waybillNumber}</p>
-                           </div>
-                       </div>
-                       <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase">{booking.status}</span>
-                   </div>
-                ))}
-             </div>
-          )}
-       </div>
+              <form onSubmit={handleQuoteSubmit} className="p-10 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <CitySearchInput label="Pickup City" placeholder="e.g. Johannesburg" value={quoteForm.origin} onChange={(val) => setQuoteForm({...quoteForm, origin: val})} required={true} />
+                    <CitySearchInput label="Delivery City" placeholder="e.g. Cape Town" value={quoteForm.destination} onChange={(val) => setQuoteForm({...quoteForm, destination: val})} required={true} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Preferred Loading Date</label><input type="date" className="w-full px-5 py-3 border-2 border-slate-100 rounded-2xl focus:border-emerald-500 outline-none font-bold" value={quoteForm.date} onChange={(e) => setQuoteForm({...quoteForm, date: e.target.value})} required /></div>
+                    <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Cargo Description</label><input type="text" placeholder="e.g. 10T Building Materials" className="w-full px-5 py-3 border-2 border-slate-100 rounded-2xl focus:border-emerald-500 outline-none font-bold" value={quoteForm.cargoDescription} onChange={(e) => setQuoteForm({...quoteForm, cargoDescription: e.target.value})} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-8">
+                    <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Est. Weight (Tons)</label><input type="number" placeholder="0" className="w-full px-5 py-3 border-2 border-slate-100 rounded-2xl font-bold" value={quoteForm.weightTons} onChange={(e) => setQuoteForm({...quoteForm, weightTons: e.target.value})} /></div>
+                    <div><label className="block text-xs font-black text-slate-400 uppercase mb-2">Pallets</label><input type="number" placeholder="0" className="w-full px-5 py-3 border-2 border-slate-100 rounded-2xl font-bold" value={quoteForm.pallets} onChange={(e) => setQuoteForm({...quoteForm, pallets: e.target.value})} /></div>
+                </div>
+                <div className="pt-6 flex gap-4">
+                    <button type="button" onClick={() => setIsQuoteModalOpen(false)} className="flex-1 py-4 text-slate-500 font-black text-lg hover:bg-slate-50 rounded-2xl transition-all">Cancel</button>
+                    <button type="submit" className="flex-[2] py-4 bg-emerald-500 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 transition-all active:scale-95">Send Request</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

@@ -1,9 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Users } from 'lucide-react';
+import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Building, MapPin, CreditCard, Users, ShieldCheck } from 'lucide-react';
 import { DocumentType, CarrierDocument, Vehicle } from '../types';
 import CitySearchInput from './CitySearchInput';
-import { VEHICLE_OPTIONS } from '../constants';
 
 interface Props {
   onComplete: () => void;
@@ -34,12 +33,32 @@ const REQUIRED_DOCS: { type: DocumentType; label: string; description: string; r
     description: 'Professional Driving Permit for the main driver.',
     requiresExpiry: true 
   },
+  {
+    type: 'Vehicle License',
+    label: 'Operator Disk / Vehicle License',
+    description: 'Valid vehicle license disc upload.',
+    requiresExpiry: true
+  }
 ];
 
+const VEHICLE_TYPES = ['Flatbed', 'Tautliner', 'Rigid', 'Refrigerated', 'Superlink', 'Superlink Tautliner', 'Pantech', '8 Ton', '1 Ton'];
+
 const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Profile state
+  const [profile, setProfile] = useState({
+    companyName: '',
+    regNumber: '',
+    vatNumber: '',
+    address: '',
+    bankName: '',
+    accountNumber: '',
+    accountType: 'Current',
+    branchCode: ''
+  });
+
   // Document State
   const [documents, setDocuments] = useState<CarrierDocument[]>([]);
   const [activeDocType, setActiveDocType] = useState<DocumentType | null>(null);
@@ -56,19 +75,11 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
   const vehiclePhotoInputRef = useRef<HTMLInputElement>(null);
   
   const [newVehicle, setNewVehicle] = useState<Partial<Vehicle>>({
-    type: VEHICLE_OPTIONS[0],
+    type: 'Flatbed',
     regNumber: '',
     capacityTons: 0,
     capacityPallets: 0,
-    photos: [],
-    providesLoadingAssist: false
-  });
-  const [isCustomType, setIsCustomType] = useState(false);
-
-  // Route Preferences State
-  const [routePrefs, setRoutePrefs] = useState({
-    origin: '',
-    destination: ''
+    photos: []
   });
 
   // --- Document Handlers ---
@@ -87,15 +98,9 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
 
   const handleDocUpload = async () => {
     if (!selectedDocFile || !activeDocType) return;
-
     setIsDocUploading(true);
-    
-    // Simulate Firebase Storage Upload
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Generate a mock Storage URL to simulate a successful upload to a bucket
-    const mockStorageUrl = `https://firebasestorage.googleapis.com/v0/b/freightconnect.appspot.com/o/carriers%2Fdocs%2F${encodeURIComponent(selectedDocFile.name)}?alt=media&token=${Math.random().toString(36)}`;
-
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const mockStorageUrl = `https://storage.freightconnect.co.za/mock/${selectedDocFile.name}`;
     const newDoc: CarrierDocument = {
       id: Math.random().toString(36).substr(2, 9),
       type: activeDocType,
@@ -103,654 +108,260 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
       fileSize: `${(selectedDocFile.size / 1024 / 1024).toFixed(2)} MB`,
       uploadDate: new Date().toISOString().split('T')[0],
       expiryDate: docExpiryDate || undefined,
-      status: 'Pending', // Default status
-      url: mockStorageUrl // Store the simulated URL
+      status: 'Pending',
+      url: mockStorageUrl
     };
-
     setDocuments(prev => [...prev.filter(d => d.type !== activeDocType), newDoc]);
     setIsDocUploading(false);
     setActiveDocType(null);
   };
 
-  // --- Vehicle Handlers ---
-
-  const handleVehiclePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setVehiclePhotoFiles(prev => [...prev, ...files]);
-    }
-  };
-
-  const removeVehiclePhoto = (index: number) => {
-    setVehiclePhotoFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
   const handleAddVehicle = async () => {
     setIsVehicleUploading(true);
-    
-    // Simulate photo uploads
-    const photoUrls: string[] = [];
-    if (vehiclePhotoFiles.length > 0) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      vehiclePhotoFiles.forEach(file => {
-          photoUrls.push(URL.createObjectURL(file)); // Mock URL for display
-      });
-    }
-
+    await new Promise(resolve => setTimeout(resolve, 800));
     const vehicle: Vehicle = {
       id: Math.random().toString(36).substr(2, 9),
-      type: newVehicle.type || 'Unknown',
+      type: newVehicle.type || 'Flatbed',
       regNumber: newVehicle.regNumber || 'UNKNOWN',
       capacityTons: Number(newVehicle.capacityTons) || 0,
       capacityPallets: Number(newVehicle.capacityPallets) || 0,
-      photos: photoUrls,
-      providesLoadingAssist: newVehicle.providesLoadingAssist || false
+      hasTailLift: false,
+      isHazmatCertified: false,
+      isRefrigerated: false,
+      isAvailable: true,
+      photos: []
     };
-
     setVehicles(prev => [...prev, vehicle]);
-    
-    // Reset Form
-    setNewVehicle({
-      type: VEHICLE_OPTIONS[0],
-      regNumber: '',
-      capacityTons: 0,
-      capacityPallets: 0,
-      photos: [],
-      providesLoadingAssist: false
-    });
-    setIsCustomType(false);
-    setVehiclePhotoFiles([]);
+    setNewVehicle({ type: 'Flatbed', regNumber: '', capacityTons: 0, capacityPallets: 0, photos: [] });
     setIsVehicleUploading(false);
     setIsVehicleModalOpen(false);
   };
 
-  const handleDeleteVehicle = (id: string) => {
-    setVehicles(prev => prev.filter(v => v.id !== id));
-  };
-
-  // --- Final Submission ---
-
   const handleSubmitProfile = async () => {
     setIsSubmitting(true);
-    // Simulate API call to submit profile for verification
-    const carrierUid = 'carrier_' + Math.random().toString(36).substr(2, 8);
-
-    console.log('--- SUBMITTING APPLICATION ---');
-    console.log(`Simulating submission for Carrier UID: ${carrierUid}`);
-    
-    // 1. Log Document writes to 'documents' collection
-    console.log(`\n1. Linking ${documents.length} documents in Firestore collection 'documents'...`);
-    documents.forEach(doc => {
-        console.log(`   > SET documents/${doc.id}`, {
-            ownerId: carrierUid,
-            type: doc.type,
-            storageUrl: doc.url,
-            fileName: doc.fileName,
-            expiryDate: doc.expiryDate || null,
-            status: doc.status,
-            rejectionReason: doc.rejectionReason || null,
-            uploadedAt: new Date().toISOString()
-        });
-    });
-    
-    // 2. Log Vehicle writes to 'vehicles' subcollection
-    console.log(`\n2. Saving ${vehicles.length} vehicles to subcollection 'vehicles'...`);
-    vehicles.forEach(v => {
-        console.log(`   > POST /carriers/${carrierUid}/vehicles/${v.id}`, {
-            ...v,
-            createdAt: new Date().toISOString()
-        });
-    });
-
-    // 3. Log Route Preferences
-    console.log(`\n3. Saving Route Preferences: ${routePrefs.origin} to ${routePrefs.destination}`);
-    
-    console.log('\n4. Updating profile verification status to PENDING');
-    
     await new Promise(resolve => setTimeout(resolve, 2000));
     setIsSubmitting(false);
     onComplete();
   };
 
-  const getDocStatus = (type: DocumentType) => documents.find(d => d.type === type);
   const allDocsUploaded = REQUIRED_DOCS.every(req => documents.find(d => d.type === req.type));
-  const atLeastOneVehicle = vehicles.length > 0;
-
-  const getStatusColor = (status: 'Pending' | 'Verified' | 'Rejected') => {
-    switch(status) {
-      case 'Verified': return 'text-emerald-600 bg-emerald-50';
-      case 'Rejected': return 'text-red-600 bg-red-50';
-      default: return 'text-amber-600 bg-amber-50';
-    }
-  };
-
-  const getStatusIcon = (status: 'Pending' | 'Verified' | 'Rejected') => {
-    switch(status) {
-      case 'Verified': return <CheckCircle size={12} className="mr-1" />;
-      case 'Rejected': return <X size={12} className="mr-1" />;
-      default: return <Loader2 size={12} className="mr-1 animate-spin" />;
-    }
-  };
+  const profileComplete = profile.companyName && profile.regNumber && profile.address && profile.bankName && profile.accountNumber;
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Complete Your Profile</h1>
-        <div className="flex items-center gap-4 text-sm">
-           <div className={`flex items-center gap-2 ${step === 1 ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>
-             <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 1 ? 'border-emerald-600 bg-emerald-50' : step > 1 ? 'bg-emerald-500 text-white border-emerald-500' : 'border-slate-300'}`}>
-                {step > 1 ? <CheckCircle size={14} /> : '1'}
-             </div>
-             Documents
-           </div>
-           <div className="w-8 h-0.5 bg-slate-200"></div>
-           <div className={`flex items-center gap-2 ${step === 2 ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>
-             <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 2 ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300'}`}>2</div>
-             Fleet & Operations
-           </div>
+    <div className="max-w-4xl mx-auto py-12 px-6 animate-in fade-in duration-700">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-black text-slate-800 mb-4 tracking-tight">Become a Partner Carrier</h1>
+        <p className="text-slate-500 max-w-xl mx-auto font-medium">Follow our three-step onboarding to verify your account and start earning on FreightConnect.</p>
+        
+        <div className="flex items-center justify-center gap-4 mt-12 mb-4">
+           {[1, 2, 3].map(i => (
+             <React.Fragment key={i}>
+                <div className={`flex flex-col items-center gap-2 ${step === i ? 'text-brand-900' : step > i ? 'text-emerald-500' : 'text-slate-300'}`}>
+                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all font-black text-lg ${step === i ? 'border-brand-900 bg-brand-50' : step > i ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                      {step > i ? <CheckCircle size={24} /> : i}
+                   </div>
+                   <span className="text-[10px] font-black uppercase tracking-widest">{i === 1 ? 'Profile' : i === 2 ? 'Documents' : 'Fleet'}</span>
+                </div>
+                {i < 3 && <div className={`w-16 h-1 bg-slate-100 rounded-full transition-all ${step > i ? 'bg-emerald-500' : ''}`}></div>}
+             </React.Fragment>
+           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content Area */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {step === 1 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-              <h2 className="text-xl font-semibold text-slate-800 mb-4">Company Documents</h2>
-              {REQUIRED_DOCS.map((doc) => {
-                const uploadedDoc = getDocStatus(doc.type);
-                return (
-                  <div 
-                    key={doc.type}
-                    className={`bg-white p-5 rounded-xl border transition-all ${
-                      uploadedDoc 
-                        ? (uploadedDoc.status === 'Rejected' ? 'border-red-200 shadow-sm' : 'border-emerald-200 shadow-sm') 
-                        : 'border-slate-200 shadow-sm hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-slate-800">{doc.label}</h3>
-                          {uploadedDoc && (
-                            <span className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${getStatusColor(uploadedDoc.status)}`}>
-                              {getStatusIcon(uploadedDoc.status)} {uploadedDoc.status}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-500 mb-3">{doc.description}</p>
-                        
-                        {uploadedDoc ? (
-                          <div className="mt-1">
-                            <div className="flex items-center gap-4 text-sm text-slate-600 bg-slate-50 p-2 rounded-lg inline-flex">
-                                <div className="flex items-center gap-1">
-                                   <FileText size={14} className="text-slate-400" />
-                                   <span className="truncate max-w-[150px]">{uploadedDoc.fileName}</span>
-                                </div>
-                                {uploadedDoc.expiryDate && (
-                                  <div className="flex items-center gap-1 text-amber-600">
-                                    <Calendar size={14} />
-                                    <span>Exp: {uploadedDoc.expiryDate}</span>
-                                  </div>
-                                )}
-                                <button 
-                                  onClick={() => handleOpenDocUpload(doc.type)}
-                                  className="text-brand-600 hover:text-brand-800 font-medium ml-2"
-                                >
-                                  {uploadedDoc.status === 'Rejected' ? 'Re-upload' : 'Edit'}
-                                </button>
-                            </div>
-                            {uploadedDoc.status === 'Rejected' && uploadedDoc.rejectionReason && (
-                                <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-md text-xs text-red-700 flex items-start gap-2">
-                                    <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
-                                    <span><span className="font-bold">Reason:</span> {uploadedDoc.rejectionReason}</span>
-                                </div>
-                            )}
-                          </div>
-                        ) : (
-                          <button 
-                            onClick={() => handleOpenDocUpload(doc.type)}
-                            className="flex items-center text-sm font-medium text-brand-600 hover:text-brand-800"
-                          >
-                            <Upload size={16} className="mr-2" />
-                            Upload Document
-                          </button>
-                        )}
-                      </div>
-                      
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        uploadedDoc 
-                          ? (uploadedDoc.status === 'Verified' ? 'bg-emerald-100 text-emerald-600' : uploadedDoc.status === 'Rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600')
-                          : 'bg-slate-100 text-slate-300'
-                      }`}>
-                        {uploadedDoc 
-                           ? (uploadedDoc.status === 'Verified' ? <CheckCircle size={20} /> : uploadedDoc.status === 'Rejected' ? <X size={20} /> : <Loader2 size={20} className="animate-spin" />) 
-                           : <FileText size={20} />}
-                      </div>
+      <div className="bg-white rounded-[40px] shadow-2xl shadow-slate-200/50 border border-slate-100 p-12">
+        {step === 1 && (
+           <div className="space-y-10 animate-in fade-in slide-in-from-right-4">
+              <section className="space-y-6">
+                 <h3 className="text-sm font-black text-brand-500 uppercase tracking-widest flex items-center gap-2"><Building size={16}/> Company Information</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Company Legal Name</label>
+                       <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.companyName} onChange={e => setProfile({...profile, companyName: e.target.value})} />
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-               <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-slate-800">Fleet & Operations</h2>
-                  <button 
-                    onClick={() => setIsVehicleModalOpen(true)}
-                    className="flex items-center gap-2 bg-brand-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700"
-                  >
-                    <Plus size={18} />
-                    Add Vehicle
-                  </button>
-               </div>
-
-               {vehicles.length === 0 ? (
-                 <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-8 text-center">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm text-slate-400">
-                      <Truck size={32} />
+                    <div>
+                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Registration Number (CIPC)</label>
+                       <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.regNumber} onChange={e => setProfile({...profile, regNumber: e.target.value})} />
                     </div>
-                    <h3 className="text-lg font-medium text-slate-800">No Vehicles Added</h3>
-                    <p className="text-slate-500 mb-4">Add at least one vehicle to start receiving load offers.</p>
-                    <button 
-                      onClick={() => setIsVehicleModalOpen(true)}
-                      className="text-brand-600 font-medium hover:underline"
-                    >
-                      Add your first vehicle
-                    </button>
                  </div>
-               ) : (
-                 <div className="grid grid-cols-1 gap-4">
-                    {vehicles.map((v) => (
-                      <div key={v.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
-                         <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                              {v.photos && v.photos.length > 0 ? (
-                                <img src={v.photos[0]} alt="Vehicle" className="w-full h-full object-cover" />
-                              ) : (
-                                <Truck className="text-slate-400" />
-                              )}
-                            </div>
-                            <div>
-                               <h4 className="font-bold text-slate-800">{v.regNumber}</h4>
-                               <p className="text-sm text-slate-600">{v.type} • {v.capacityTons} Tons</p>
-                               <p className="text-xs text-slate-400 mt-1">
-                                   {v.capacityPallets} Pallets 
-                                   {v.providesLoadingAssist && <span className="ml-2 text-emerald-600 font-bold">• Driver Assists</span>}
-                               </p>
-                            </div>
-                         </div>
-                         <button 
-                           onClick={() => handleDeleteVehicle(v.id)}
-                           className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                         >
-                           <Trash2 size={18} />
-                         </button>
-                      </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">VAT Number (Optional)</label>
+                       <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.vatNumber} onChange={e => setProfile({...profile, vatNumber: e.target.value})} />
+                    </div>
+                    <div>
+                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Primary Operating Address</label>
+                       <div className="relative">
+                          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                          <input type="text" className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.address} onChange={e => setProfile({...profile, address: e.target.value})} />
+                       </div>
+                    </div>
+                 </div>
+              </section>
+
+              <section className="space-y-6 border-t pt-10">
+                 <h3 className="text-sm font-black text-brand-500 uppercase tracking-widest flex items-center gap-2"><CreditCard size={16}/> Payout Details (Banking)</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Bank Name</label>
+                       <select className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.bankName} onChange={e => setProfile({...profile, bankName: e.target.value})}>
+                          <option value="">Select Bank</option>
+                          <option value="FNB">First National Bank</option>
+                          <option value="Standard">Standard Bank</option>
+                          <option value="Nedbank">Nedbank</option>
+                          <option value="Absa">Absa</option>
+                          <option value="Capitec">Capitec</option>
+                       </select>
+                    </div>
+                    <div>
+                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Account Number</label>
+                       <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.accountNumber} onChange={e => setProfile({...profile, accountNumber: e.target.value})} />
+                    </div>
+                 </div>
+              </section>
+
+              <button onClick={() => setStep(2)} disabled={!profileComplete} className="w-full py-5 bg-brand-900 text-white rounded-3xl font-black text-xl hover:bg-brand-800 disabled:opacity-30 transition-all active:scale-95 shadow-xl shadow-brand-900/20">Next: Document Verification</button>
+           </div>
+        )}
+
+        {step === 2 && (
+           <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+              <h3 className="text-sm font-black text-brand-500 uppercase tracking-widest flex items-center gap-2"><ShieldCheck size={16}/> Compliance Uploads</h3>
+              <div className="space-y-4">
+                 {REQUIRED_DOCS.map(doc => {
+                    const uploaded = documents.find(d => d.type === doc.type);
+                    return (
+                       <div key={doc.type} className={`p-6 rounded-3xl border-2 transition-all flex items-center justify-between ${uploaded ? 'border-emerald-100 bg-emerald-50' : 'border-slate-100 hover:border-brand-200'}`}>
+                          <div className="flex items-center gap-4">
+                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${uploaded ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                <FileText size={24}/>
+                             </div>
+                             <div>
+                                <h4 className="font-black text-slate-800">{doc.label}</h4>
+                                <p className="text-xs text-slate-500 font-medium">{doc.description}</p>
+                             </div>
+                          </div>
+                          <button onClick={() => handleOpenDocUpload(doc.type)} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${uploaded ? 'bg-white text-emerald-600' : 'bg-brand-900 text-white hover:bg-brand-800'}`}>
+                             {uploaded ? 'Re-upload' : 'Upload File'}
+                          </button>
+                       </div>
+                    );
+                 })}
+              </div>
+              <div className="flex gap-4">
+                 <button onClick={() => setStep(1)} className="flex-1 py-5 bg-slate-100 text-slate-600 rounded-3xl font-black text-xl">Back</button>
+                 <button onClick={() => setStep(3)} disabled={!allDocsUploaded} className="flex-[2] py-5 bg-brand-900 text-white rounded-3xl font-black text-xl hover:bg-brand-800 disabled:opacity-30 shadow-xl shadow-brand-900/20">Next: Fleet Setup</button>
+              </div>
+           </div>
+        )}
+
+        {step === 3 && (
+           <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+              <div className="flex justify-between items-center">
+                 <h3 className="text-sm font-black text-brand-500 uppercase tracking-widest flex items-center gap-2"><Truck size={16}/> Fleet Configuration</h3>
+                 <button onClick={() => setIsVehicleModalOpen(true)} className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-2"><Plus size={16}/> Add Truck</button>
+              </div>
+              
+              {vehicles.length === 0 ? (
+                 <div className="p-16 border-2 border-dashed border-slate-100 rounded-[40px] text-center bg-slate-50">
+                    <Truck size={64} className="mx-auto text-slate-200 mb-6" />
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Add your first vehicle to complete onboarding</p>
+                 </div>
+              ) : (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {vehicles.map(v => (
+                       <div key={v.id} className="p-5 rounded-3xl border border-slate-100 bg-white shadow-sm flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 bg-slate-900 text-emerald-400 rounded-2xl flex items-center justify-center">
+                                <Truck size={24}/>
+                             </div>
+                             <div>
+                                <h4 className="font-black text-slate-800">{v.regNumber}</h4>
+                                <p className="text-[10px] font-black uppercase text-slate-400">{v.type} • {v.capacityTons}T</p>
+                             </div>
+                          </div>
+                          <button onClick={() => setVehicles(vehicles.filter(item => item.id !== v.id))} className="text-red-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>
+                       </div>
                     ))}
                  </div>
-               )}
-
-               {/* New Route Preferences Section */}
-               <div className="mt-8 pt-6 border-t border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-4">Preferred Operating Route</h3>
-                  <p className="text-sm text-slate-500 mb-4">Help us match you with loads by specifying your primary route or base of operations.</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <CitySearchInput 
-                        label="Primary Origin"
-                        placeholder="e.g. Johannesburg"
-                        value={routePrefs.origin}
-                        onChange={(val) => setRoutePrefs(prev => ({...prev, origin: val}))}
-                        className="z-30"
-                        required={true}
-                      />
-                      <CitySearchInput 
-                        label="Primary Destination"
-                        placeholder="e.g. Cape Town"
-                        value={routePrefs.destination}
-                        onChange={(val) => setRoutePrefs(prev => ({...prev, destination: val}))}
-                        className="z-20"
-                        required={true}
-                      />
-                  </div>
-               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar Summary */}
-        <div className="lg:col-span-1">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 sticky top-8">
-            <h3 className="font-bold text-slate-800 mb-4">Verification Progress</h3>
-            
-            <div className="flex items-center gap-3 mb-6">
-               <div className="relative">
-                 <div className="w-12 h-12 rounded-full border-4 border-slate-100 flex items-center justify-center text-slate-400 font-bold">
-                    {step === 1 
-                      ? Math.round((documents.length / REQUIRED_DOCS.length) * 50) 
-                      : 50 + (vehicles.length > 0 ? 50 : 0)
-                    }%
-                 </div>
-               </div>
-               <div>
-                 <p className="text-sm font-medium text-slate-800">Application Status</p>
-                 <p className="text-xs text-slate-500">
-                   {step === 1 ? 'Uploading Documents' : 'Adding Vehicles'}
-                 </p>
-               </div>
-            </div>
-
-            <div className="space-y-3 text-sm border-t border-slate-100 pt-4 mb-6">
-              <div className="flex items-center gap-2 text-slate-600">
-                <CheckCircle size={16} className={allDocsUploaded ? "text-emerald-500" : "text-slate-300"} />
-                <span>Required Documents</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <CheckCircle size={16} className={vehicles.length > 0 ? "text-emerald-500" : "text-slate-300"} />
-                <span>Vehicle & Route Info</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <CheckCircle size={16} className="text-slate-300" />
-                <span>Admin Verification</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {step === 1 ? (
-                <button 
-                  onClick={() => setStep(2)}
-                  disabled={!allDocsUploaded}
-                  className={`w-full py-3 rounded-lg font-bold flex justify-center items-center transition-all ${
-                    allDocsUploaded 
-                      ? 'bg-brand-900 text-white hover:bg-brand-800 shadow-md' 
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  Next: Fleet & Operations
-                  <ChevronRight size={18} className="ml-2" />
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setStep(1)}
-                    className="px-4 py-3 rounded-lg font-medium text-slate-600 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all"
-                  >
-                    Back
-                  </button>
-                  <button 
-                    onClick={handleSubmitProfile}
-                    disabled={!atLeastOneVehicle || isSubmitting || !routePrefs.origin || !routePrefs.destination}
-                    className={`flex-1 py-3 rounded-lg font-bold flex justify-center items-center transition-all ${
-                      atLeastOneVehicle && routePrefs.origin && routePrefs.destination
-                        ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md' 
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="animate-spin" size={20} />
-                    ) : (
-                      <>
-                        Submit Application
-                        <CheckCircle size={18} className="ml-2" />
-                      </>
-                    )}
-                  </button>
-                </div>
               )}
-            </div>
-          </div>
-        </div>
+
+              <div className="flex gap-4">
+                 <button onClick={() => setStep(2)} className="flex-1 py-5 bg-slate-100 text-slate-600 rounded-3xl font-black text-xl">Back</button>
+                 <button onClick={handleSubmitProfile} disabled={vehicles.length === 0 || isSubmitting} className="flex-[2] py-5 bg-emerald-500 text-white rounded-3xl font-black text-xl hover:bg-emerald-600 disabled:opacity-30 shadow-xl shadow-emerald-500/20">
+                    {isSubmitting ? <Loader2 className="animate-spin" size={24}/> : 'Finish & Submit'}
+                 </button>
+              </div>
+           </div>
+        )}
       </div>
 
-      {/* Document Upload Modal */}
+      {/* Doc Modal */}
       {activeDocType && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-800">Upload {activeDocType}</h3>
-              <button onClick={() => setActiveDocType(null)} className="text-slate-400 hover:text-slate-600">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {/* File Drop Zone */}
-              <div 
-                onClick={() => docInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-                  selectedDocFile ? 'border-emerald-400 bg-emerald-50' : 'border-slate-300 hover:border-brand-500 hover:bg-brand-50'
-                }`}
-              >
-                <input 
-                  type="file" 
-                  ref={docInputRef} 
-                  className="hidden" 
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={handleDocFileSelect}
-                />
-                
-                {selectedDocFile ? (
-                   <div className="flex flex-col items-center">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm text-emerald-500">
-                        <FileText size={24} />
-                      </div>
-                      <p className="font-medium text-slate-800">{selectedDocFile.name}</p>
-                      <p className="text-xs text-slate-500 mt-1">{(selectedDocFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setSelectedDocFile(null); }}
-                        className="text-xs text-red-500 hover:text-red-700 font-medium mt-2"
-                      >
-                        Remove
-                      </button>
-                   </div>
-                ) : (
-                  <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-400">
-                      <Upload size={24} />
-                    </div>
-                    <p className="font-medium text-slate-800">Click to upload document</p>
-                    <p className="text-xs text-slate-500 mt-1">PDF, JPG or PNG (Max 5MB)</p>
+         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-md animate-in fade-in">
+            <div className="bg-white rounded-[40px] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95">
+               <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tight">Upload {activeDocType}</h3>
+                  <button onClick={() => setActiveDocType(null)} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center"><X size={20}/></button>
+               </div>
+               <div className="space-y-6">
+                  <div onClick={() => docInputRef.current?.click()} className="border-4 border-dashed border-slate-100 rounded-[32px] p-10 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-all group">
+                     <input type="file" ref={docInputRef} className="hidden" onChange={handleDocFileSelect} />
+                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-white group-hover:shadow-lg transition-all">
+                        <Upload size={32} className="text-slate-400 group-hover:text-emerald-500" />
+                     </div>
+                     <p className="font-black text-slate-800">{selectedDocFile ? selectedDocFile.name : 'Choose File'}</p>
+                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-2">PDF, JPG, PNG up to 10MB</p>
                   </div>
-                )}
-              </div>
-
-              {/* Expiry Date Input (Conditional) */}
-              {REQUIRED_DOCS.find(d => d.type === activeDocType)?.requiresExpiry && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Expiry Date</label>
-                  <input 
-                    type="date" 
-                    value={docExpiryDate}
-                    onChange={(e) => setDocExpiryDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    We'll remind you before this expires.
-                  </p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => setActiveDocType(null)}
-                  className="flex-1 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleDocUpload}
-                  disabled={!selectedDocFile || (REQUIRED_DOCS.find(d => d.type === activeDocType)?.requiresExpiry && !docExpiryDate) || isDocUploading}
-                  className={`flex-1 py-2.5 text-white font-bold rounded-lg flex justify-center items-center ${
-                    !selectedDocFile || isDocUploading
-                      ? 'bg-slate-300 cursor-not-allowed'
-                      : 'bg-brand-900 hover:bg-brand-800'
-                  }`}
-                >
-                  {isDocUploading ? <Loader2 className="animate-spin" size={18} /> : 'Save Document'}
-                </button>
-              </div>
+                  {REQUIRED_DOCS.find(d => d.type === activeDocType)?.requiresExpiry && (
+                     <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Document Expiry Date</label>
+                        <input type="date" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={docExpiryDate} onChange={e => setDocExpiryDate(e.target.value)} />
+                     </div>
+                  )}
+                  <button onClick={handleDocUpload} disabled={!selectedDocFile || isDocUploading} className="w-full py-4 bg-brand-900 text-white rounded-2xl font-black shadow-lg shadow-brand-900/20 active:scale-95 transition-all">
+                     {isDocUploading ? <Loader2 size={24} className="animate-spin mx-auto"/> : 'Securely Upload'}
+                  </button>
+               </div>
             </div>
-          </div>
-        </div>
+         </div>
       )}
 
-      {/* Vehicle Add/Edit Modal */}
+      {/* Vehicle Modal */}
       {isVehicleModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-slate-800">Add Vehicle</h3>
-                    <button onClick={() => setIsVehicleModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                        <X size={24} />
-                    </button>
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
-                        <select 
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            value={isCustomType ? 'Other' : newVehicle.type}
-                            onChange={(e) => {
-                                if (e.target.value === 'Other') {
-                                    setIsCustomType(true);
-                                    setNewVehicle({...newVehicle, type: ''});
-                                } else {
-                                    setIsCustomType(false);
-                                    setNewVehicle({...newVehicle, type: e.target.value});
-                                }
-                            }}
-                        >
-                            {VEHICLE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                    </div>
-
-                    {isCustomType && (
-                        <div className="animate-in fade-in slide-in-from-top-2">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Specify Type</label>
-                            <input 
-                                type="text"
-                                placeholder="e.g. Lowbed, Tautliner"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                value={newVehicle.type}
-                                onChange={(e) => setNewVehicle({...newVehicle, type: e.target.value})}
-                            />
-                        </div>
-                    )}
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Registration Number</label>
-                        <input 
-                            type="text" 
-                            placeholder="e.g., ABC 123 GP"
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 uppercase"
-                            value={newVehicle.regNumber}
-                            onChange={(e) => setNewVehicle({...newVehicle, regNumber: e.target.value.toUpperCase()})}
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Capacity (Tons)</label>
-                            <input 
-                                type="number" 
-                                min="0"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                value={newVehicle.capacityTons}
-                                onChange={(e) => setNewVehicle({...newVehicle, capacityTons: Number(e.target.value)})}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Capacity (Pallets)</label>
-                            <input 
-                                type="number" 
-                                min="0"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                value={newVehicle.capacityPallets}
-                                onChange={(e) => setNewVehicle({...newVehicle, capacityPallets: Number(e.target.value)})}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Loading Assistance */}
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                        <label className="flex items-start cursor-pointer gap-3">
-                            <input 
-                                type="checkbox" 
-                                className="mt-1 w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                                checked={newVehicle.providesLoadingAssist}
-                                onChange={(e) => setNewVehicle({...newVehicle, providesLoadingAssist: e.target.checked})}
-                            />
-                            <div>
-                                <span className="block text-sm font-bold text-slate-800">Driver / Crew Assists with Loading</span>
-                                <span className="block text-xs text-slate-500">Check this if you can help load and unload goods.</span>
-                            </div>
-                        </label>
-                    </div>
-
-                    {/* Vehicle Photo Upload (Multiple) */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Vehicle Photos</label>
-                        
-                        {/* Photo List */}
-                        {vehiclePhotoFiles.length > 0 && (
-                           <div className="grid grid-cols-3 gap-3 mb-3">
-                             {vehiclePhotoFiles.map((file, idx) => (
-                               <div key={idx} className="relative aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
-                                 <img src={URL.createObjectURL(file)} alt="Preview" className="w-full h-full object-cover" />
-                                 <button 
-                                   onClick={() => removeVehiclePhoto(idx)}
-                                   className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-red-500 transition-colors"
-                                 >
-                                   <X size={12} />
-                                 </button>
-                               </div>
-                             ))}
-                           </div>
-                        )}
-
-                        <div 
-                            onClick={() => vehiclePhotoInputRef.current?.click()}
-                            className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer hover:bg-slate-50 transition-colors"
-                        >
-                             <input 
-                                type="file" 
-                                ref={vehiclePhotoInputRef} 
-                                className="hidden" 
-                                accept="image/*"
-                                multiple
-                                onChange={handleVehiclePhotoSelect}
-                            />
-                            <div className="flex flex-col items-center text-slate-400">
-                                <ImageIcon size={24} className="mb-1" />
-                                <span className="text-xs">Click to upload photos</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pt-4">
-                        <button 
-                            onClick={handleAddVehicle}
-                            disabled={!newVehicle.regNumber || !newVehicle.capacityTons || !newVehicle.type || isVehicleUploading}
-                            className={`w-full py-3 rounded-lg font-bold text-white flex justify-center items-center ${
-                                !newVehicle.regNumber || !newVehicle.type || isVehicleUploading
-                                ? 'bg-slate-300 cursor-not-allowed'
-                                : 'bg-emerald-500 hover:bg-emerald-600'
-                            }`}
-                        >
-                            {isVehicleUploading ? <Loader2 className="animate-spin" size={20} /> : 'Save Vehicle'}
-                        </button>
-                    </div>
-                </div>
+         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-md animate-in fade-in">
+            <div className="bg-white rounded-[40px] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95">
+               <div className="flex justify-between items-center mb-8">
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tight">Add Fleet Vehicle</h3>
+                  <button onClick={() => setIsVehicleModalOpen(false)} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center"><X size={20}/></button>
+               </div>
+               <div className="space-y-6">
+                  <div>
+                     <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Truck Configuration</label>
+                     <select className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500" value={newVehicle.type} onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}>
+                        {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                     </select>
+                  </div>
+                  <div>
+                     <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Registration Plate</label>
+                     <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 uppercase" value={newVehicle.regNumber} onChange={e => setNewVehicle({...newVehicle, regNumber: e.target.value.toUpperCase()})} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Tonnage</label>
+                        <input type="number" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500" value={newVehicle.capacityTons} onChange={e => setNewVehicle({...newVehicle, capacityTons: Number(e.target.value)})} />
+                     </div>
+                     <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Max Pallets</label>
+                        <input type="number" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500" value={newVehicle.capacityPallets} onChange={e => setNewVehicle({...newVehicle, capacityPallets: Number(e.target.value)})} />
+                     </div>
+                  </div>
+                  <button onClick={handleAddVehicle} disabled={!newVehicle.regNumber || isVehicleUploading} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+                     {isVehicleUploading ? <Loader2 size={24} className="animate-spin mx-auto"/> : 'Register Vehicle'}
+                  </button>
+               </div>
             </div>
-        </div>
+         </div>
       )}
-
     </div>
   );
 };
