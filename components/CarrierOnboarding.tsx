@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Building, MapPin, CreditCard, Users, ShieldCheck } from 'lucide-react';
+import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Building, MapPin, CreditCard, Users, ShieldCheck, Eye } from 'lucide-react';
 import { DocumentType, CarrierDocument, Vehicle } from '../types';
 import CitySearchInput from './CitySearchInput';
 
@@ -44,22 +44,23 @@ const REQUIRED_DOCS: { type: DocumentType; label: string; description: string; r
 const VEHICLE_TYPES = ['Flatbed', 'Tautliner', 'Rigid', 'Refrigerated', 'Superlink', 'Superlink Tautliner', 'Pantech', '8 Ton', '1 Ton'];
 
 const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Set default step to 3 and open the modal pre-filled as requested
+  const [step, setStep] = useState<1 | 2 | 3>(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Profile state
   const [profile, setProfile] = useState({
-    companyName: '',
-    regNumber: '',
+    companyName: 'Swift Logistics',
+    regNumber: '2010/123456/07',
     vatNumber: '',
-    address: '',
-    bankName: '',
-    accountNumber: '',
+    address: '123 Logistics Way, Johannesburg',
+    bankName: 'FNB',
+    accountNumber: '62881234567',
     accountType: 'Current',
-    branchCode: ''
+    branchCode: '250655'
   });
 
-  // Document State
+  // Document State - Pre-filled some for UX flow
   const [documents, setDocuments] = useState<CarrierDocument[]>([]);
   const [activeDocType, setActiveDocType] = useState<DocumentType | null>(null);
   const [selectedDocFile, setSelectedDocFile] = useState<File | null>(null);
@@ -69,16 +70,14 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
 
   // Vehicle State
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
-  const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState<File[]>([]);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(true); // Modal open by default
   const [isVehicleUploading, setIsVehicleUploading] = useState(false);
-  const vehiclePhotoInputRef = useRef<HTMLInputElement>(null);
   
   const [newVehicle, setNewVehicle] = useState<Partial<Vehicle>>({
     type: 'Flatbed',
-    regNumber: '',
-    capacityTons: 0,
-    capacityPallets: 0,
+    regNumber: 'HRT-123',
+    capacityTons: 25,
+    capacityPallets: 12,
     photos: []
   });
 
