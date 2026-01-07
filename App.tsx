@@ -23,7 +23,7 @@ import AdminPanel from './components/AdminPanel';
 import MyBookings from './components/MyBookings';
 import CarrierOnboarding from './components/CarrierOnboarding';
 import { getLogisticsAdvice } from './services/geminiService';
-import { MOCK_LISTINGS, MOCK_DISPUTES, MOCK_BOOKINGS, MOCK_AUDIT_LOGS, MOCK_SHIPPERS } from './constants';
+import { MOCK_LISTINGS, MOCK_DISPUTES, MOCK_BOOKINGS, MOCK_AUDIT_LOGS, MOCK_SHIPPERS, MOCK_CARRIERS } from './constants';
 
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>('admin');
@@ -199,6 +199,9 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    const currentCarrier = MOCK_CARRIERS.find(c => c.id === 'c1');
+    const fleet = currentCarrier?.vehicles || [];
+
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard 
@@ -211,6 +214,7 @@ const App: React.FC = () => {
           onPayout={handlePayoutRequest}
           onRequestQuote={handleRequestQuote}
           onCancelQuote={handleCancelQuote}
+          fleet={fleet}
         />;
       case 'post-load':
         return <Dashboard 
@@ -221,6 +225,7 @@ const App: React.FC = () => {
            onPostListing={handlePostListing}
            onUpdateListing={handleUpdateListing}
            onDeleteListing={handleDeleteListing}
+           fleet={fleet}
         />;
       case 'marketplace':
         return <Marketplace 

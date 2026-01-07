@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Building, MapPin, CreditCard, Users, ShieldCheck, Eye } from 'lucide-react';
+import { Upload, FileText, Calendar, CheckCircle, X, AlertCircle, ChevronRight, Loader2, Truck, Trash2, Plus, Image as ImageIcon, Building, MapPin, CreditCard, Users, ShieldCheck, Eye, ArrowRightLeft } from 'lucide-react';
 import { DocumentType, CarrierDocument, Vehicle } from '../types';
 import CitySearchInput from './CitySearchInput';
 
@@ -41,11 +41,11 @@ const REQUIRED_DOCS: { type: DocumentType; label: string; description: string; r
   }
 ];
 
-const VEHICLE_TYPES = ['Flatbed', 'Tautliner', 'Rigid', 'Refrigerated', 'Superlink', 'Superlink Tautliner', 'Pantech', '8 Ton', '1 Ton'];
+const VEHICLE_TYPES = ['Flatbed', 'Tautliner', 'Rigid', 'Refrigerated', 'Superlink', 'Superlink Tautliner', 'Pantech', '8 Ton', '1 Ton', 'Other'];
 
 const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
-  // Set default step to 3 and open the modal pre-filled as requested
-  const [step, setStep] = useState<1 | 2 | 3>(3);
+  // Set default step to 1 for a natural flow, or 3 if specifically testing fleet
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Profile state
@@ -53,14 +53,16 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
     companyName: 'Swift Logistics',
     regNumber: '2010/123456/07',
     vatNumber: '',
-    address: '123 Logistics Way, Johannesburg',
+    address: 'Johannesburg',
+    preferredOrigin: '',
+    preferredDestination: '',
     bankName: 'FNB',
     accountNumber: '62881234567',
     accountType: 'Current',
     branchCode: '250655'
   });
 
-  // Document State - Pre-filled some for UX flow
+  // Document State
   const [documents, setDocuments] = useState<CarrierDocument[]>([]);
   const [activeDocType, setActiveDocType] = useState<DocumentType | null>(null);
   const [selectedDocFile, setSelectedDocFile] = useState<File | null>(null);
@@ -70,14 +72,15 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
 
   // Vehicle State
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(true); // Modal open by default
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [isVehicleUploading, setIsVehicleUploading] = useState(false);
+  const [customVehicleType, setCustomVehicleType] = useState('');
   
   const [newVehicle, setNewVehicle] = useState<Partial<Vehicle>>({
     type: 'Flatbed',
-    regNumber: 'HRT-123',
-    capacityTons: 25,
-    capacityPallets: 12,
+    regNumber: '',
+    capacityTons: 0,
+    capacityPallets: 0,
     photos: []
   });
 
@@ -118,9 +121,12 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
   const handleAddVehicle = async () => {
     setIsVehicleUploading(true);
     await new Promise(resolve => setTimeout(resolve, 800));
+    
+    const finalType = newVehicle.type === 'Other' ? (customVehicleType || 'Other Truck') : (newVehicle.type || 'Flatbed');
+
     const vehicle: Vehicle = {
       id: Math.random().toString(36).substr(2, 9),
-      type: newVehicle.type || 'Flatbed',
+      type: finalType,
       regNumber: newVehicle.regNumber || 'UNKNOWN',
       capacityTons: Number(newVehicle.capacityTons) || 0,
       capacityPallets: Number(newVehicle.capacityPallets) || 0,
@@ -132,6 +138,7 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
     };
     setVehicles(prev => [...prev, vehicle]);
     setNewVehicle({ type: 'Flatbed', regNumber: '', capacityTons: 0, capacityPallets: 0, photos: [] });
+    setCustomVehicleType('');
     setIsVehicleUploading(false);
     setIsVehicleModalOpen(false);
   };
@@ -144,7 +151,8 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
   };
 
   const allDocsUploaded = REQUIRED_DOCS.every(req => documents.find(d => d.type === req.type));
-  const profileComplete = profile.companyName && profile.regNumber && profile.address && profile.bankName && profile.accountNumber;
+  // Updated profileComplete check to include the new preferred route fields
+  const profileComplete = profile.companyName && profile.regNumber && profile.address && profile.preferredOrigin && profile.preferredDestination && profile.bankName && profile.accountNumber;
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-6 animate-in fade-in duration-700">
@@ -182,18 +190,47 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
                        <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.regNumber} onChange={e => setProfile({...profile, regNumber: e.target.value})} />
                     </div>
                  </div>
+                 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">VAT Number (Optional)</label>
                        <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.vatNumber} onChange={e => setProfile({...profile, vatNumber: e.target.value})} />
                     </div>
                     <div>
-                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Primary Operating Address</label>
-                       <div className="relative">
-                          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                          <input type="text" className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 transition-all" value={profile.address} onChange={e => setProfile({...profile, address: e.target.value})} />
-                       </div>
+                       {/* Upgraded to CitySearchInput for address/city autocomplete */}
+                       <CitySearchInput 
+                         label="Primary Operating City" 
+                         value={profile.address} 
+                         onChange={(val) => setProfile({...profile, address: val})} 
+                         placeholder="e.g. Johannesburg" 
+                         required={true}
+                         className="[&_input]:bg-slate-50 [&_input]:border-none [&_input]:rounded-2xl [&_input]:font-bold [&_input]:py-3 [&_input]:px-12"
+                       />
                     </div>
+                 </div>
+              </section>
+
+              {/* New Section for Origin/Destination lane preferences */}
+              <section className="space-y-6 border-t pt-10">
+                 <h3 className="text-sm font-black text-brand-500 uppercase tracking-widest flex items-center gap-2"><ArrowRightLeft size={16}/> Main Service Lane</h3>
+                 <p className="text-xs text-slate-500 font-medium">Define your most common route to help us prioritize jobs for your fleet.</p>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <CitySearchInput 
+                      label="Primary Origin" 
+                      value={profile.preferredOrigin} 
+                      onChange={(val) => setProfile({...profile, preferredOrigin: val})} 
+                      placeholder="Start City" 
+                      required={true}
+                      className="[&_input]:bg-slate-50 [&_input]:border-none [&_input]:rounded-2xl [&_input]:font-bold [&_input]:py-3 [&_input]:px-12"
+                    />
+                    <CitySearchInput 
+                      label="Primary Destination" 
+                      value={profile.preferredDestination} 
+                      onChange={(val) => setProfile({...profile, preferredDestination: val})} 
+                      placeholder="End City" 
+                      required={true}
+                      className="[&_input]:bg-slate-50 [&_input]:border-none [&_input]:rounded-2xl [&_input]:font-bold [&_input]:py-3 [&_input]:px-12"
+                    />
                  </div>
               </section>
 
@@ -340,6 +377,20 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
                         {VEHICLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                      </select>
                   </div>
+                  
+                  {newVehicle.type === 'Other' && (
+                    <div className="animate-in slide-in-from-top-2 duration-300">
+                       <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Specify Truck Type</label>
+                       <input 
+                        type="text" 
+                        placeholder="e.g. Lowbed, Car Carrier, Cattle Trailer" 
+                        className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500" 
+                        value={customVehicleType} 
+                        onChange={e => setCustomVehicleType(e.target.value)} 
+                       />
+                    </div>
+                  )}
+
                   <div>
                      <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Registration Plate</label>
                      <input type="text" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500 uppercase" value={newVehicle.regNumber} onChange={e => setNewVehicle({...newVehicle, regNumber: e.target.value.toUpperCase()})} />
@@ -354,7 +405,7 @@ const CarrierOnboarding: React.FC<Props> = ({ onComplete }) => {
                         <input type="number" className="w-full px-5 py-3 bg-slate-50 rounded-2xl border-none font-bold outline-none ring-2 ring-transparent focus:ring-emerald-500" value={newVehicle.capacityPallets} onChange={e => setNewVehicle({...newVehicle, capacityPallets: Number(e.target.value)})} />
                      </div>
                   </div>
-                  <button onClick={handleAddVehicle} disabled={!newVehicle.regNumber || isVehicleUploading} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+                  <button onClick={handleAddVehicle} disabled={!newVehicle.regNumber || (newVehicle.type === 'Other' && !customVehicleType) || isVehicleUploading} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
                      {isVehicleUploading ? <Loader2 size={24} className="animate-spin mx-auto"/> : 'Register Vehicle'}
                   </button>
                </div>

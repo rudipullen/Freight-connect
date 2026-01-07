@@ -6,7 +6,6 @@ import {
   Image as ImageIcon, FileText, Plus, Paperclip, Eye, Loader2, 
   CheckCircle, AlertCircle, Box, Truck, Warehouse, Navigation, 
   MapPin, User, Phone, Edit, QrCode, Signature, Download,
-  // Added missing icon imports
   Calendar, Package, ShieldCheck
 } from 'lucide-react';
 

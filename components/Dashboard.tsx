@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { UserRole, Listing, CargoType } from '../types';
+import { UserRole, Listing, CargoType, Vehicle } from '../types';
 import { 
-  Activity, Banknote, Truck, Users, Clock, AlertTriangle, Calendar, MapPin, 
+  Activity, Banknote, Truck, Users, Clock, AlertTriangle, AlertCircle, Calendar, MapPin, 
   Edit2, Trash2, CheckCircle, Info, PlusCircle, Package, FileText, X, 
   Trash, ArrowRightLeft, ShieldCheck, Wallet, Download, ExternalLink,
   ChevronRight
@@ -18,6 +18,7 @@ interface DashboardProps {
   notifications?: {id: number, text: string, time: string}[];
   quoteRequests?: any[];
   wallet?: { escrow: number; available: number };
+  fleet?: Vehicle[];
   onPayout?: () => void;
   onPostListing?: (listing: Listing) => void;
   onUpdateListing?: (listing: Listing) => void;
@@ -60,6 +61,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   notifications = [],
   quoteRequests = [],
   wallet = { escrow: 0, available: 0 },
+  fleet = [],
   onPayout,
   onPostListing,
   onUpdateListing,
@@ -71,6 +73,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  // Internal view state for carriers when they click "Edit" from main dashboard
+  const [internalIsPosting, setInternalIsPosting] = useState(isPosting || false);
 
   const [postForm, setPostForm] = useState({
     origin: '',
@@ -87,7 +91,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     driverAssistance: false
   });
 
-  // Fixed missing quoteForm state
   const [quoteForm, setQuoteForm] = useState({
     origin: '',
     destination: '',
@@ -97,9 +100,36 @@ const Dashboard: React.FC<DashboardProps> = ({
     pallets: ''
   });
 
+  // Capacity Validation Logic
+  const getCapacityWarning = () => {
+    // Find matching vehicles in fleet for the selected type
+    const matchingVehicles = fleet.filter(v => v.type.toLowerCase().includes(postForm.vehicleType.toLowerCase()));
+    
+    if (matchingVehicles.length === 0) return null;
+
+    // Get max capacities for this type across the fleet
+    const maxTons = Math.max(...matchingVehicles.map(v => v.capacityTons));
+    const maxPallets = Math.max(...matchingVehicles.map(v => v.capacityPallets));
+
+    const enteredTons = Number(postForm.tons) || 0;
+    const enteredPallets = Number(postForm.pallets) || 0;
+
+    if (enteredTons > maxTons) {
+      return `Tonnage exceeds your fleet's max capacity for ${postForm.vehicleType} (${maxTons}T).`;
+    }
+    if (enteredPallets > maxPallets) {
+      return `Pallet count exceeds your fleet's max capacity for ${postForm.vehicleType} (${maxPallets} plts).`;
+    }
+
+    return null;
+  };
+
+  const capacityWarning = getCapacityWarning();
+
   const handlePostSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!onPostListing) return;
+    
     const carrierRate = parseFloat(postForm.baseRate);
     const marketPrice = carrierRate * 1.15; // 15% Platform Markup
 
@@ -134,7 +164,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
-  // Fixed missing handleQuoteSubmit handler
   const handleQuoteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!onRequestQuote) return;
@@ -160,7 +189,14 @@ const Dashboard: React.FC<DashboardProps> = ({
       driverAssistance: route.driverAssistance || false
     });
     setEditingId(route.id);
+    setInternalIsPosting(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Are you sure you want to remove this listing? It will be permanently deleted.")) {
+      onDeleteListing?.(id);
+    }
   };
 
   if (role === 'carrier') {
@@ -177,7 +213,7 @@ const Dashboard: React.FC<DashboardProps> = ({
        );
     }
 
-    if (isPosting) {
+    if (internalIsPosting) {
       return (
         <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex justify-between items-center mb-8">
@@ -187,7 +223,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               </h2>
               <p className="text-slate-500">Sell your unused truck space to local shippers.</p>
             </div>
-            <button onClick={() => window.history.back()} className="text-slate-400 hover:text-slate-600 font-medium">Cancel</button>
+            <button onClick={() => setInternalIsPosting(false)} className="text-slate-400 hover:text-slate-600 font-medium">Back to Dashboard</button>
           </div>
 
           {showSuccess && (
@@ -243,7 +279,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
 
                       <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                        <label className="block text-sm font-bold text-slate-700 mb-4">Space Utilization</label>
+                        <div className="flex justify-between items-center mb-4">
+                           <label className="block text-sm font-bold text-slate-700">Space Utilization</label>
+                           {capacityWarning && (
+                             <span className="text-[10px] bg-amber-100 text-amber-600 px-2 py-1 rounded-lg font-black flex items-center gap-1 animate-pulse">
+                               <AlertTriangle size={12} /> Capacity Warning
+                             </span>
+                           )}
+                        </div>
                         <div className="flex gap-4 mb-4">
                           <button type="button" onClick={() => setPostForm({...postForm, availabilityType: 'Full'})} className={`flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all ${postForm.availabilityType === 'Full' ? 'border-emerald-500 bg-white text-emerald-600 shadow-sm' : 'border-transparent bg-slate-200 text-slate-500'}`}>Full Truck</button>
                           <button type="button" onClick={() => setPostForm({...postForm, availabilityType: 'Shared Space'})} className={`flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all ${postForm.availabilityType === 'Shared Space' ? 'border-emerald-500 bg-white text-emerald-600 shadow-sm' : 'border-transparent bg-slate-200 text-slate-500'}`}>Shared Space</button>
@@ -251,13 +294,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="grid grid-cols-2 gap-4">
                            <div>
                              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Max Weight (Tons)</label>
-                             <input type="number" placeholder="e.g. 15" className="w-full px-4 py-2 border rounded-lg" value={postForm.tons} onChange={(e) => setPostForm({...postForm, tons: e.target.value})} />
+                             <input type="number" placeholder="0" className={`w-full px-4 py-2 border rounded-lg ${capacityWarning?.includes('Tonnage') ? 'border-amber-400 bg-amber-50' : ''}`} value={postForm.tons} onChange={(e) => setPostForm({...postForm, tons: e.target.value})} />
                            </div>
                            <div>
                              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Max Pallets</label>
-                             <input type="number" placeholder="e.g. 10" className="w-full px-4 py-2 border rounded-lg" value={postForm.pallets} onChange={(e) => setPostForm({...postForm, pallets: e.target.value})} />
+                             <input type="number" placeholder="0" className={`w-full px-4 py-2 border rounded-lg ${capacityWarning?.includes('Pallet') ? 'border-amber-400 bg-amber-50' : ''}`} value={postForm.pallets} onChange={(e) => setPostForm({...postForm, pallets: e.target.value})} />
                            </div>
                         </div>
+                        {capacityWarning && (
+                          <p className="mt-3 text-xs text-amber-600 font-bold flex items-start gap-2 bg-amber-50 p-3 rounded-xl border border-amber-100">
+                             <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                             {capacityWarning}
+                          </p>
+                        )}
                         {postForm.availabilityType === 'Shared Space' && (
                           <div className="mt-4 animate-in slide-in-from-top-2">
                              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Space Description</label>
@@ -317,16 +366,19 @@ const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               <div className="bg-white p-6 rounded-3xl border border-slate-200">
-                <h4 className="font-bold text-slate-800 mb-4">Current Fleet Status</h4>
+                <h4 className="font-bold text-slate-800 mb-4">Your Fleet Capacities</h4>
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                    <span className="text-xs font-bold text-slate-500">Superlinks Active</span>
-                    <span className="font-black text-slate-800">2</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                    <span className="text-xs font-bold text-slate-500">8 Tonners Available</span>
-                    <span className="font-black text-slate-800">4</span>
-                  </div>
+                  {fleet.length > 0 ? fleet.map(v => (
+                    <div key={v.id} className="p-3 bg-slate-50 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-white border rounded-lg flex items-center justify-center text-slate-400"><Truck size={16}/></div>
+                        <div><p className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">{v.type}</p><p className="text-xs font-bold text-slate-800">{v.regNumber}</p></div>
+                      </div>
+                      <div className="text-right"><p className="text-xs font-black text-slate-800">{v.capacityTons}T</p><p className="text-[9px] font-bold text-slate-400">{v.capacityPallets} plts</p></div>
+                    </div>
+                  )) : (
+                    <p className="text-xs text-slate-400 italic">No fleet data available.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -359,7 +411,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                       <div className="flex gap-2 pt-4 border-t border-slate-50">
                         <button onClick={() => handleEdit(listing)} className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 flex items-center justify-center gap-2"><Edit2 size={12}/> Edit</button>
-                        <button onClick={() => onDeleteListing?.(listing.id)} className="flex-1 py-2 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-2"><Trash2 size={12}/> Delete</button>
+                        <button onClick={() => handleDelete(listing.id)} className="flex-1 py-2 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-2"><Trash2 size={12}/> Delete</button>
                       </div>
                    </div>
                  ))
@@ -392,6 +444,37 @@ const Dashboard: React.FC<DashboardProps> = ({
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-2 space-y-8">
+              {myListings.length > 0 && (
+                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                   <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+                      <h3 className="font-black text-slate-800 flex items-center gap-2">
+                        <Truck size={20} className="text-brand-500" />
+                        YOUR ACTIVE LISTINGS
+                      </h3>
+                      <button onClick={() => setInternalIsPosting(true)} className="text-xs font-black text-brand-600 flex items-center gap-1 hover:underline">
+                        + Post New Route
+                      </button>
+                   </div>
+                   <div className="divide-y divide-slate-50">
+                      {myListings.map(listing => (
+                         <div key={listing.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                            <div className="space-y-1">
+                               <p className="font-black text-slate-800">{listing.origin} → {listing.destination}</p>
+                               <p className="text-[10px] text-slate-400 font-bold uppercase">{listing.date} • {listing.vehicleType}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                               <p className="font-black text-emerald-600">R {listing.baseRate.toLocaleString()}</p>
+                               <div className="flex gap-1">
+                                  <button onClick={() => handleEdit(listing)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all" title="Edit Listing"><Edit2 size={16}/></button>
+                                  <button onClick={() => handleDelete(listing.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Delete Listing"><Trash2 size={16}/></button>
+                               </div>
+                            </div>
+                         </div>
+                      ))}
+                   </div>
+                </div>
+              )}
+
               {quoteRequests.length > 0 && (
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
                   <div className="bg-slate-900 p-6 flex justify-between items-center">
