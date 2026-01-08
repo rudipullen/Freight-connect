@@ -22,11 +22,16 @@ import Marketplace from './components/Marketplace';
 import AdminPanel from './components/AdminPanel';
 import MyBookings from './components/MyBookings';
 import CarrierOnboarding from './components/CarrierOnboarding';
+import Login from './components/Login';
 import { getLogisticsAdvice } from './services/geminiService';
 import { MOCK_LISTINGS, MOCK_DISPUTES, MOCK_BOOKINGS, MOCK_AUDIT_LOGS, MOCK_SHIPPERS, MOCK_CARRIERS } from './constants';
 
 const App: React.FC = () => {
-  const [role, setRole] = useState<UserRole>('admin');
+  // Session State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [role, setRole] = useState<UserRole>('shipper');
+  const [userEmail, setUserEmail] = useState('');
+  
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -60,7 +65,7 @@ const App: React.FC = () => {
     available: 12800,
   });
 
-  // Carrier Verification State ('unverified' | 'pending' | 'verified')
+  // Carrier Verification State
   const [carrierStatus, setCarrierStatus] = useState<'unverified' | 'pending' | 'verified'>('verified');
   
   // AI Chat State
@@ -70,6 +75,20 @@ const App: React.FC = () => {
     { role: 'model', text: "Hi! I'm the FreightConnect AI. Ask me about route pricing, document requirements, or vehicle types."}
   ]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+
+  // Auth Handlers
+  const handleLogin = (selectedRole: UserRole, email: string) => {
+    setRole(selectedRole);
+    setUserEmail(email);
+    setIsLoggedIn(true);
+    setActiveTab('dashboard');
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUserEmail('');
+    setIsMobileMenuOpen(false);
+  };
 
   // Handlers
   const handlePostListing = (listing: Listing) => {
@@ -265,8 +284,13 @@ const App: React.FC = () => {
     }
   };
 
+  // If not logged in, only show the Login Screen
+  if (!isLoggedIn) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col md:flex-row animate-in fade-in duration-500">
       <div className="md:hidden bg-brand-900 text-white p-4 flex justify-between items-center z-50 sticky top-0 shadow-md">
         <div className="flex items-center gap-2">
           <Truck size={24} className="text-emerald-400" />
@@ -288,19 +312,28 @@ const App: React.FC = () => {
 
         <div className="p-6 bg-brand-800/50 mb-2">
            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">
-                {role === 'admin' ? 'AD' : (role === 'carrier' ? 'SL' : 'AS')}
+              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold uppercase">
+                {userEmail ? userEmail[0] : (role === 'admin' ? 'AD' : (role === 'carrier' ? 'SL' : 'AS'))}
               </div>
-              <div>
-                <p className="text-white font-bold text-sm truncate max-w-[120px]">{role === 'admin' ? 'Owner Admin' : (role === 'carrier' ? 'Swift Logistics' : 'Acme Supplies')}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm truncate">{userEmail || (role === 'admin' ? 'Owner Admin' : (role === 'carrier' ? 'Swift Logistics' : 'Acme Supplies'))}</p>
                 <p className="text-[10px] text-brand-300 uppercase tracking-widest">{role}</p>
               </div>
            </div>
-           <div className="flex gap-1">
-              <button onClick={() => setRole('carrier')} className={`text-[9px] uppercase font-bold tracking-tighter px-2 py-1 rounded border ${role === 'carrier' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-brand-700 hover:bg-brand-800'}`}>Carrier</button>
-              <button onClick={() => setRole('shipper')} className={`text-[9px] uppercase font-bold tracking-tighter px-2 py-1 rounded border ${role === 'shipper' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-brand-700 hover:bg-brand-800'}`}>Shipper</button>
-              <button onClick={() => setRole('admin')} className={`text-[9px] uppercase font-bold tracking-tighter px-2 py-1 rounded border ${role === 'admin' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-brand-700 hover:bg-brand-800'}`}>Admin</button>
+           
+           {/* Demo Switcher for convenience while developing */}
+           <div className="flex gap-1 mb-4">
+              <button onClick={() => setRole('carrier')} className={`flex-1 text-[8px] uppercase font-black tracking-tighter px-1.5 py-1 rounded border transition-all ${role === 'carrier' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'border-brand-700 hover:bg-brand-800'}`}>Carrier</button>
+              <button onClick={() => setRole('shipper')} className={`flex-1 text-[8px] uppercase font-black tracking-tighter px-1.5 py-1 rounded border transition-all ${role === 'shipper' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'border-brand-700 hover:bg-brand-800'}`}>Shipper</button>
+              <button onClick={() => setRole('admin')} className={`flex-1 text-[8px] uppercase font-black tracking-tighter px-1.5 py-1 rounded border transition-all ${role === 'admin' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'border-brand-700 hover:bg-brand-800'}`}>Admin</button>
            </div>
+
+           <button 
+             onClick={handleLogout}
+             className="w-full py-2.5 bg-brand-700/50 text-brand-200 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-brand-700 transition-all flex items-center justify-center gap-2 border border-brand-700"
+           >
+             <LogOut size={14} /> Log Out
+           </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
